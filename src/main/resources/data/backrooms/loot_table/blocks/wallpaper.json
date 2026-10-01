@@ -1,0 +1,109 @@
+{
+  "type": "minecraft:block",
+  "pools": [
+    {
+      "rolls": 1.0,
+      "entries": [
+        {
+          "type": "minecraft:item",
+          "name": "backrooms:wallpaper",
+          "functions": [
+            {
+              "function": "minecraft:set_count",
+              "add": true,
+              "count": 1.0,
+              "conditions": [
+                {
+                  "condition": "minecraft:block_state_property",
+                  "block": "backrooms:wallpaper",
+                  "properties": {
+                    "down": "true"
+                  }
+                }
+              ]
+            },
+            {
+              "function": "minecraft:set_count",
+              "add": true,
+              "count": 1.0,
+              "conditions": [
+                {
+                  "condition": "minecraft:block_state_property",
+                  "block": "backrooms:wallpaper",
+                  "properties": {
+                    "up": "true"
+                  }
+                }
+              ]
+            },
+            {
+              "function": "minecraft:set_count",
+              "add": true,
+              "count": 1.0,
+              "conditions": [
+                {
+                  "condition": "minecraft:block_state_property",
+                  "block": "backrooms:wallpaper",
+                  "properties": {
+                    "north": "true"
+                  }
+                }
+              ]
+            },
+            {
+              "function": "minecraft:set_count",
+              "add": true,
+              "count": 1.0,
+              "conditions": [
+                {
+                  "condition": "minecraft:block_state_property",
+                  "block": "backrooms:wallpaper",
+                  "properties": {
+                    "south": "true"
+                  }
+                }
+              ]
+            },
+            {
+              "function": "minecraft:set_count",
+              "add": true,
+              "count": 1.0,
+              "conditions": [
+                {
+                  "condition": "minecraft:block_state_property",
+                  "block": "backrooms:wallpaper",
+                  "properties": {
+                    "west": "true"
+                  }
+                }
+              ]
+            },
+            {
+              "function": "minecraft:set_count",
+              "add": true,
+              "count": 1.0,
+              "conditions": [
+                {
+                  "condition": "minecraft:block_state_property",
+                  "block": "backrooms:wallpaper",
+                  "properties": {
+                    "east": "true"
+                  }
+                }
+              ]
+            },
+            {
+              "function": "minecraft:set_count",
+              "add": true,
+              "count": -1.0
+            },
+            {
+              "function": "minecraft:explosion_decay"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "random_sequence": "backrooms:blocks/wallpaper"
+}
