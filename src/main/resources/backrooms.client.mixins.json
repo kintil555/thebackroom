@@ -3,7 +3,8 @@
   "package": "com.backrooms.mixin.client",
   "compatibilityLevel": "JAVA_25",
   "client": [
-    "LevelRendererMixin"
+    "LevelRendererMixin",
+    "MultiPlayerGameModeMixin"
   ],
   "injectors": {
     "defaultRequire": 1
