@@ -1,0 +1,60 @@
+{
+  "variants": {
+    "cover=wallpaper,facing=north": {
+      "model": "backrooms:block/wallpaper_cover"
+    },
+    "cover=carpet,facing=north": {
+      "model": "backrooms:block/carpet_cover"
+    },
+    "cover=wallpaper,facing=east": {
+      "model": "backrooms:block/wallpaper_cover",
+      "uvlock": true,
+      "y": 90
+    },
+    "cover=carpet,facing=east": {
+      "model": "backrooms:block/carpet_cover",
+      "uvlock": true,
+      "y": 90
+    },
+    "cover=wallpaper,facing=south": {
+      "model": "backrooms:block/wallpaper_cover",
+      "uvlock": true,
+      "y": 180
+    },
+    "cover=carpet,facing=south": {
+      "model": "backrooms:block/carpet_cover",
+      "uvlock": true,
+      "y": 180
+    },
+    "cover=wallpaper,facing=west": {
+      "model": "backrooms:block/wallpaper_cover",
+      "uvlock": true,
+      "y": 270
+    },
+    "cover=carpet,facing=west": {
+      "model": "backrooms:block/carpet_cover",
+      "uvlock": true,
+      "y": 270
+    },
+    "cover=wallpaper,facing=up": {
+      "model": "backrooms:block/wallpaper_cover",
+      "uvlock": true,
+      "x": 270
+    },
+    "cover=carpet,facing=up": {
+      "model": "backrooms:block/carpet_cover",
+      "uvlock": true,
+      "x": 270
+    },
+    "cover=wallpaper,facing=down": {
+      "model": "backrooms:block/wallpaper_cover",
+      "uvlock": true,
+      "x": 90
+    },
+    "cover=carpet,facing=down": {
+      "model": "backrooms:block/carpet_cover",
+      "uvlock": true,
+      "x": 90
+    }
+  }
+}

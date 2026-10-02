@@ -1,7 +1,9 @@
 package com.backrooms;
 
-import com.backrooms.block.CarpetBlock;
-import com.backrooms.block.WallpaperBlock;
+import com.backrooms.block.CoverDisplayBlock;
+import com.backrooms.block.ScrewPilesBlock;
+import com.backrooms.item.CarpetItem;
+import com.backrooms.item.WallpaperItem;
 import java.util.function.Function;
 import net.fabricmc.fabric.api.creativetab.v1.CreativeModeTabEvents;
 import net.minecraft.core.Registry;
@@ -16,12 +18,11 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.material.MapColor;
-import net.minecraft.world.level.material.PushReaction;
 
 public final class ModBlocks {
-	public static final Block SCREW_PILES = register(
+	public static final Block SCREW_PILES = registerWithItem(
 		"screw_piles",
-		Block::new,
+		ScrewPilesBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.METAL)
 			.strength(3.0F, 6.0F)
@@ -30,30 +31,21 @@ public final class ModBlocks {
 			.noOcclusion() // tekstur punya bagian transparan
 	);
 
-	public static final Block WALLPAPER = register(
-		"wallpaper",
-		WallpaperBlock::new,
-		BlockBehaviour.Properties.of()
-			.mapColor(MapColor.COLOR_YELLOW)
-			.strength(0.1F)
-			.sound(SoundType.WOOL)
-			.pushReaction(PushReaction.DESTROY)
+	/** Blok model-saja untuk menggambar lapisan di sisi blok mana pun (tanpa item, tidak ada di dunia). */
+	public static final CoverDisplayBlock COVER_DISPLAY = (CoverDisplayBlock) registerBlock(
+		"cover_display",
+		CoverDisplayBlock::new,
+		BlockBehaviour.Properties.of().noCollision().noOcclusion().noLootTable()
 	);
 
-	public static final Block CARPET = register(
-		"carpet",
-		CarpetBlock::new,
-		BlockBehaviour.Properties.of()
-			.mapColor(MapColor.COLOR_YELLOW)
-			.strength(0.1F)
-			.sound(SoundType.WOOL)
-			.pushReaction(PushReaction.DESTROY)
-	);
+	/** Wallpaper dan Carpet hanya item: lapisannya disimpan di Screw Piles (blockstate) atau chunk (attachment). */
+	public static final Item WALLPAPER = registerItem("wallpaper", WallpaperItem::new);
+	public static final Item CARPET = registerItem("carpet", CarpetItem::new);
 
 	private ModBlocks() {
 	}
 
-	/** Memanggil method ini memaksa class diload sehingga semua blok terdaftar. */
+	/** Memanggil method ini memaksa class diload sehingga semua blok dan item terdaftar. */
 	public static void init() {
 		ResourceKey<CreativeModeTab> buildingBlocks =
 			ResourceKey.create(Registries.CREATIVE_MODE_TAB, Identifier.withDefaultNamespace("building_blocks"));
@@ -64,14 +56,23 @@ public final class ModBlocks {
 		});
 	}
 
-	private static Block register(String name, Function<BlockBehaviour.Properties, Block> factory, BlockBehaviour.Properties properties) {
+	private static Block registerBlock(String name, Function<BlockBehaviour.Properties, Block> factory, BlockBehaviour.Properties properties) {
 		Identifier id = Identifier.fromNamespaceAndPath(BackroomsMod.MOD_ID, name);
-
 		ResourceKey<Block> blockKey = ResourceKey.create(Registries.BLOCK, id);
-		Block block = Registry.register(BuiltInRegistries.BLOCK, blockKey, factory.apply(properties.setId(blockKey)));
+		return Registry.register(BuiltInRegistries.BLOCK, blockKey, factory.apply(properties.setId(blockKey)));
+	}
 
+	private static Block registerWithItem(String name, Function<BlockBehaviour.Properties, Block> factory, BlockBehaviour.Properties properties) {
+		Block block = registerBlock(name, factory, properties);
+		Identifier id = Identifier.fromNamespaceAndPath(BackroomsMod.MOD_ID, name);
 		ResourceKey<Item> itemKey = ResourceKey.create(Registries.ITEM, id);
 		Registry.register(BuiltInRegistries.ITEM, itemKey, new BlockItem(block, new Item.Properties().setId(itemKey).useBlockDescriptionPrefix()));
 		return block;
+	}
+
+	private static Item registerItem(String name, Function<Item.Properties, Item> factory) {
+		Identifier id = Identifier.fromNamespaceAndPath(BackroomsMod.MOD_ID, name);
+		ResourceKey<Item> itemKey = ResourceKey.create(Registries.ITEM, id);
+		return Registry.register(BuiltInRegistries.ITEM, itemKey, factory.apply(new Item.Properties().setId(itemKey).useItemDescriptionPrefix()));
 	}
 }

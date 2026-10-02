@@ -2,11 +2,13 @@
 
 Mod bertema Backrooms. Tahap ini: blok dekorasi saja (dimensi menyusul).
 
-| Blok | Fungsi |
+| Item/Blok | Fungsi |
 |---|---|
-| Screw Piles | Pondasi besi, satu-satunya tempat Wallpaper bisa menempel |
-| Wallpaper | Klik kanan pada sisi Screw Piles -> menempel di sisi itu. Break (crosshair di sisi wallpaper) butuh 4 detik, hanya sisi yang dibidik yang lepas |
-| Carpet | Klik kanan pada sisi blok penuh mana pun -> menempel di sisi itu |
+| Screw Piles | Pondasi besi. Tiap sisinya bisa dilapisi Wallpaper/Carpet (disimpan di blockstate-nya sendiri) |
+| Wallpaper | Item. Klik kanan sisi Screw Piles -> tekstur menempel di face itu. Break (bidik sisi berlapis) butuh 4 detik, hanya lapisan yang lepas |
+| Carpet | Item. Klik kanan sisi penuh blok mana pun -> menempel di face itu (disimpan di data chunk, bukan blok terpisah). Break hanya melepas carpet, blok tetap |
+
+Retak (crack) dan partikel saat break hanya muncul di sisi yang berlapis. Jika blok pemilik carpet dihancurkan/diganti, carpet ikut jatuh.
 
 Item ada di creative tab **Building Blocks**.
 

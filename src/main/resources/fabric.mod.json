@@ -4,17 +4,31 @@
 	"version": "${version}",
 	"name": "Backrooms",
 	"description": "Blok bertema Backrooms: Wallpaper, Carpet, dan Screw Piles.",
-	"authors": ["Backrooms Mod"],
+	"authors": [
+		"Backrooms Mod"
+	],
 	"license": "MIT",
 	"icon": "assets/backrooms/icon.png",
 	"environment": "*",
 	"entrypoints": {
-		"main": ["com.backrooms.BackroomsMod"]
+		"main": [
+			"com.backrooms.BackroomsMod"
+		],
+		"client": [
+			"com.backrooms.client.BackroomsClient"
+		]
 	},
 	"depends": {
 		"fabricloader": ">=0.19.5",
 		"minecraft": "~26.2",
 		"java": ">=25",
 		"fabric-api": "*"
-	}
+	},
+	"mixins": [
+		"backrooms.mixins.json",
+		{
+			"config": "backrooms.client.mixins.json",
+			"environment": "client"
+		}
+	]
 }

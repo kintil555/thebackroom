@@ -1,7 +1,125 @@
 {
-  "variants": {
-    "": {
-      "model": "backrooms:block/screw_piles"
+  "multipart": [
+    {
+      "apply": {
+        "model": "backrooms:block/screw_piles"
+      }
+    },
+    {
+      "when": {
+        "north": "wallpaper"
+      },
+      "apply": {
+        "model": "backrooms:block/wallpaper_cover"
+      }
+    },
+    {
+      "when": {
+        "north": "carpet"
+      },
+      "apply": {
+        "model": "backrooms:block/carpet_cover"
+      }
+    },
+    {
+      "when": {
+        "east": "wallpaper"
+      },
+      "apply": {
+        "model": "backrooms:block/wallpaper_cover",
+        "uvlock": true,
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "east": "carpet"
+      },
+      "apply": {
+        "model": "backrooms:block/carpet_cover",
+        "uvlock": true,
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "south": "wallpaper"
+      },
+      "apply": {
+        "model": "backrooms:block/wallpaper_cover",
+        "uvlock": true,
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "south": "carpet"
+      },
+      "apply": {
+        "model": "backrooms:block/carpet_cover",
+        "uvlock": true,
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "west": "wallpaper"
+      },
+      "apply": {
+        "model": "backrooms:block/wallpaper_cover",
+        "uvlock": true,
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "west": "carpet"
+      },
+      "apply": {
+        "model": "backrooms:block/carpet_cover",
+        "uvlock": true,
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "up": "wallpaper"
+      },
+      "apply": {
+        "model": "backrooms:block/wallpaper_cover",
+        "uvlock": true,
+        "x": 270
+      }
+    },
+    {
+      "when": {
+        "up": "carpet"
+      },
+      "apply": {
+        "model": "backrooms:block/carpet_cover",
+        "uvlock": true,
+        "x": 270
+      }
+    },
+    {
+      "when": {
+        "down": "wallpaper"
+      },
+      "apply": {
+        "model": "backrooms:block/wallpaper_cover",
+        "uvlock": true,
+        "x": 90
+      }
+    },
+    {
+      "when": {
+        "down": "carpet"
+      },
+      "apply": {
+        "model": "backrooms:block/carpet_cover",
+        "uvlock": true,
+        "x": 90
+      }
     }
-  }
+  ]
 }
