@@ -1,7 +1,40 @@
 {
   "variants": {
-    "": {
-      "model": "backrooms:block/ceiling"
-    }
+    "": [
+      {
+        "model": "backrooms:block/ceiling"
+      },
+      {
+        "model": "backrooms:block/ceiling",
+        "y": 90
+      },
+      {
+        "model": "backrooms:block/ceiling",
+        "y": 180
+      },
+      {
+        "model": "backrooms:block/ceiling",
+        "y": 270
+      },
+      {
+        "model": "backrooms:block/ceiling",
+        "x": 180
+      },
+      {
+        "model": "backrooms:block/ceiling",
+        "x": 180,
+        "y": 90
+      },
+      {
+        "model": "backrooms:block/ceiling",
+        "x": 180,
+        "y": 180
+      },
+      {
+        "model": "backrooms:block/ceiling",
+        "x": 180,
+        "y": 270
+      }
+    ]
   }
 }
