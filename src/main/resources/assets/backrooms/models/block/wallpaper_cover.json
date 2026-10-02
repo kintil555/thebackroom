@@ -1,29 +1,16 @@
 {
-  "ambientocclusion": false,
+  "ambientocclusion": true,
   "textures": {
     "particle": "backrooms:block/wallpaper",
     "cover": "backrooms:block/wallpaper"
   },
   "elements": [
     {
-      "from": [
-        0,
-        0,
-        -0.01
-      ],
-      "to": [
-        16,
-        16,
-        -0.01
-      ],
+      "from": [0, 0, -0.05],
+      "to": [16, 16, -0.05],
       "faces": {
         "north": {
-          "uv": [
-            0,
-            0,
-            16,
-            16
-          ],
+          "uv": [0, 0, 16, 16],
           "texture": "#cover",
           "cullface": "north"
         }

@@ -8,6 +8,8 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import net.fabricmc.fabric.api.attachment.v1.AttachmentTarget;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientChunkEvents;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;
@@ -17,17 +19,55 @@ import net.minecraft.world.level.chunk.LevelChunk;
 /** Salinan sisi-client dari data carpet per chunk, dibaca thread yang membangun mesh chunk. */
 public final class ClientCovers {
 	private static final Map<Long, CoverData> CHUNKS = new ConcurrentHashMap<>();
+	/** Chunk client yang sedang dimuat; dipakai untuk memeriksa ulang data carpet secara berkala. */
+	private static final Map<Long, LevelChunk> LOADED = new ConcurrentHashMap<>();
+	private static final int POLL_INTERVAL_TICKS = 10;
+	private static int pollCounter;
 
 	private ClientCovers() {
 	}
 
 	public static void init() {
 		ClientChunkEvents.CHUNK_LOAD.register((level, chunk) -> {
+			LOADED.put(key(chunk.getPos().x(), chunk.getPos().z()), chunk);
 			AttachmentTarget target = (AttachmentTarget) chunk;
 			update(level, chunk, null, target.getAttached(CoverAttachments.COVERS));
 			target.onAttachedSet(CoverAttachments.COVERS).register((oldData, newData) -> update(level, chunk, oldData, newData));
 		});
-		ClientChunkEvents.CHUNK_UNLOAD.register((level, chunk) -> CHUNKS.remove(key(chunk.getPos().x(), chunk.getPos().z())));
+		ClientChunkEvents.CHUNK_UNLOAD.register((level, chunk) -> {
+			long chunkKey = key(chunk.getPos().x(), chunk.getPos().z());
+			CHUNKS.remove(chunkKey);
+			LOADED.remove(chunkKey);
+		});
+		ClientTickEvents.END_CLIENT_TICK.register(ClientCovers::poll);
+	}
+
+	/**
+	 * Pengaman: data attachment bisa tiba setelah chunk dimuat atau tanpa memicu event di client.
+	 * Secara berkala bandingkan salinan lokal dengan attachment chunk dan bangun ulang mesh jika berbeda.
+	 */
+	private static void poll(Minecraft minecraft) {
+		ClientLevel level = minecraft.level;
+		if (level == null) {
+			CHUNKS.clear();
+			LOADED.clear();
+			return;
+		}
+		if (++pollCounter < POLL_INTERVAL_TICKS) {
+			return;
+		}
+		pollCounter = 0;
+		for (LevelChunk chunk : LOADED.values()) {
+			CoverData current = ((AttachmentTarget) chunk).getAttached(CoverAttachments.COVERS);
+			if (current != null && current.isEmpty()) {
+				current = null;
+			}
+			long chunkKey = key(chunk.getPos().x(), chunk.getPos().z());
+			CoverData cached = CHUNKS.get(chunkKey);
+			if (current != cached) {
+				update(level, chunk, cached, current);
+			}
+		}
 	}
 
 	private static long key(int chunkX, int chunkZ) {

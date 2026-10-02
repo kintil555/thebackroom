@@ -6,5 +6,6 @@ public class BackroomsClient implements ClientModInitializer {
 	@Override
 	public void onInitializeClient() {
 		ClientCovers.init();
+		CoverHud.init();
 	}
 }

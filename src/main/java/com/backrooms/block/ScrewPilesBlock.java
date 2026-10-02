@@ -60,6 +60,30 @@ public class ScrewPilesBlock extends Block {
 		return state.setValue(COVERS.get(face), cover);
 	}
 
+	/** State dengan keenam sisi berlapis cover yang sama (dipakai item Wallpapers). */
+	public static BlockState withAllCovers(BlockState state, PanelCover cover) {
+		BlockState result = state;
+		for (Direction direction : Direction.values()) {
+			result = withCover(result, direction, cover);
+		}
+		return result;
+	}
+
+	/**
+	 * Blok ini noOcclusion (tekstur punya lubang), tapi secara fisik tetap blok penuh:
+	 * tanpa override ini redaman cahayanya hanya 1 sehingga cahaya bocor menembus dinding Screw Piles.
+	 */
+	@Override
+	protected int getLightDampening(BlockState state) {
+		return 15;
+	}
+
+	/** Sisi yang saling menempel antar Screw Piles tidak digambar (tidak terlihat, dan gelap karena tidak ada cahaya di dalam). */
+	@Override
+	protected boolean skipRendering(BlockState state, BlockState neighborState, Direction direction) {
+		return neighborState.is(this) || super.skipRendering(state, neighborState, direction);
+	}
+
 	/**
 	 * Dipanggil oleh item Wallpaper/Carpet: menempelkan lapisan pada sisi Screw Piles yang di-klik.
 	 *

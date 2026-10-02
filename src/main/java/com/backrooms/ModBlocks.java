@@ -4,6 +4,7 @@ import com.backrooms.block.CoverDisplayBlock;
 import com.backrooms.block.ScrewPilesBlock;
 import com.backrooms.item.CarpetItem;
 import com.backrooms.item.WallpaperItem;
+import com.backrooms.item.WallpapersItem;
 import java.util.function.Function;
 import net.fabricmc.fabric.api.creativetab.v1.CreativeModeTabEvents;
 import net.minecraft.core.Registry;
@@ -31,6 +32,16 @@ public final class ModBlocks {
 			.noOcclusion() // tekstur punya bagian transparan
 	);
 
+	/** Ceiling: blok langit-langit penuh, bisa dilapisi Carpet seperti blok penuh lainnya. */
+	public static final Block CEILING = registerWithItem(
+		"ceiling",
+		Block::new,
+		BlockBehaviour.Properties.of()
+			.mapColor(MapColor.QUARTZ)
+			.strength(1.5F, 3.0F)
+			.sound(SoundType.STONE)
+	);
+
 	/** Blok model-saja untuk menggambar lapisan di sisi blok mana pun (tanpa item, tidak ada di dunia). */
 	public static final CoverDisplayBlock COVER_DISPLAY = (CoverDisplayBlock) registerBlock(
 		"cover_display",
@@ -42,6 +53,9 @@ public final class ModBlocks {
 	public static final Item WALLPAPER = registerItem("wallpaper", WallpaperItem::new);
 	public static final Item CARPET = registerItem("carpet", CarpetItem::new);
 
+	/** Wallpapers: hanya lewat creative. Screw Piles dengan keenam sisinya berlapis Wallpaper. */
+	public static final Item WALLPAPERS = registerItem("wallpapers", WallpapersItem::new);
+
 	private ModBlocks() {
 	}
 
@@ -51,7 +65,9 @@ public final class ModBlocks {
 			ResourceKey.create(Registries.CREATIVE_MODE_TAB, Identifier.withDefaultNamespace("building_blocks"));
 		CreativeModeTabEvents.modifyOutputEvent(buildingBlocks).register(output -> {
 			output.accept(SCREW_PILES);
+			output.accept(CEILING);
 			output.accept(WALLPAPER);
+			output.accept(WALLPAPERS);
 			output.accept(CARPET);
 		});
 	}
