@@ -17,3 +17,5 @@
 - Fix culling: lapisan punya sisi belakang. Dilihat dari belakang (mis. lewat lubang Screw Piles): Wallpaper menampilkan oak planks, Carpet menampilkan carpet
 - Blok baru: Ceiling. Item baru: Wallpapers (creative only, Screw Piles dengan 6 sisi berwallpaper)
 - Texture baru untuk Carpet dan Ceiling
+- F3 (Targeted Block), Jade, dan WTHIT mendeteksi Wallpaper/Carpet saat crosshair membidik sisi berlapis, bukan blok pemiliknya. Middle click tetap meng-clone blok + lapisannya
+- Item hasil pick (middle click) blok berlapis: ikon inventaris, hotbar, dan tangan kini ikut menampilkan tekstur Wallpaper/Carpet di sisi yang berlapis. Screw Piles lewat item model JSON (composite + select block_state), blok lain lewat mixin ItemModelResolver

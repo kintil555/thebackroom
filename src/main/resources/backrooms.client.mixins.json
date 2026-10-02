@@ -3,6 +3,9 @@
   "package": "com.backrooms.mixin.client",
   "compatibilityLevel": "JAVA_25",
   "client": [
+    "DebugLookingAtStateMixin",
+    "DebugLookingAtTagsMixin",
+    "ItemModelResolverMixin",
     "LevelRendererMixin",
     "MultiPlayerGameModeMixin"
   ],

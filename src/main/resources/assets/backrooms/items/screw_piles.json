@@ -1,6 +1,155 @@
 {
   "model": {
-    "type": "minecraft:model",
-    "model": "backrooms:block/screw_piles"
+    "type": "minecraft:composite",
+    "models": [
+      {
+        "type": "minecraft:model",
+        "model": "backrooms:block/screw_piles"
+      },
+      {
+        "type": "minecraft:select",
+        "property": "minecraft:block_state",
+        "block_state_property": "north",
+        "cases": [
+          {
+            "when": "wallpaper",
+            "model": {
+              "type": "minecraft:model",
+              "model": "backrooms:item/cover/wallpaper_north"
+            }
+          },
+          {
+            "when": "carpet",
+            "model": {
+              "type": "minecraft:model",
+              "model": "backrooms:item/cover/carpet_north"
+            }
+          }
+        ],
+        "fallback": {
+          "type": "minecraft:empty"
+        }
+      },
+      {
+        "type": "minecraft:select",
+        "property": "minecraft:block_state",
+        "block_state_property": "east",
+        "cases": [
+          {
+            "when": "wallpaper",
+            "model": {
+              "type": "minecraft:model",
+              "model": "backrooms:item/cover/wallpaper_east"
+            }
+          },
+          {
+            "when": "carpet",
+            "model": {
+              "type": "minecraft:model",
+              "model": "backrooms:item/cover/carpet_east"
+            }
+          }
+        ],
+        "fallback": {
+          "type": "minecraft:empty"
+        }
+      },
+      {
+        "type": "minecraft:select",
+        "property": "minecraft:block_state",
+        "block_state_property": "south",
+        "cases": [
+          {
+            "when": "wallpaper",
+            "model": {
+              "type": "minecraft:model",
+              "model": "backrooms:item/cover/wallpaper_south"
+            }
+          },
+          {
+            "when": "carpet",
+            "model": {
+              "type": "minecraft:model",
+              "model": "backrooms:item/cover/carpet_south"
+            }
+          }
+        ],
+        "fallback": {
+          "type": "minecraft:empty"
+        }
+      },
+      {
+        "type": "minecraft:select",
+        "property": "minecraft:block_state",
+        "block_state_property": "west",
+        "cases": [
+          {
+            "when": "wallpaper",
+            "model": {
+              "type": "minecraft:model",
+              "model": "backrooms:item/cover/wallpaper_west"
+            }
+          },
+          {
+            "when": "carpet",
+            "model": {
+              "type": "minecraft:model",
+              "model": "backrooms:item/cover/carpet_west"
+            }
+          }
+        ],
+        "fallback": {
+          "type": "minecraft:empty"
+        }
+      },
+      {
+        "type": "minecraft:select",
+        "property": "minecraft:block_state",
+        "block_state_property": "up",
+        "cases": [
+          {
+            "when": "wallpaper",
+            "model": {
+              "type": "minecraft:model",
+              "model": "backrooms:item/cover/wallpaper_up"
+            }
+          },
+          {
+            "when": "carpet",
+            "model": {
+              "type": "minecraft:model",
+              "model": "backrooms:item/cover/carpet_up"
+            }
+          }
+        ],
+        "fallback": {
+          "type": "minecraft:empty"
+        }
+      },
+      {
+        "type": "minecraft:select",
+        "property": "minecraft:block_state",
+        "block_state_property": "down",
+        "cases": [
+          {
+            "when": "wallpaper",
+            "model": {
+              "type": "minecraft:model",
+              "model": "backrooms:item/cover/wallpaper_down"
+            }
+          },
+          {
+            "when": "carpet",
+            "model": {
+              "type": "minecraft:model",
+              "model": "backrooms:item/cover/carpet_down"
+            }
+          }
+        ],
+        "fallback": {
+          "type": "minecraft:empty"
+        }
+      }
+    ]
   }
 }

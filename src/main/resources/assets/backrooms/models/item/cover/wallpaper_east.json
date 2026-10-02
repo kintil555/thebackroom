@@ -1,0 +1,32 @@
+{
+  "parent": "minecraft:block/block",
+  "textures": {
+    "particle": "backrooms:block/wallpaper",
+    "cover": "backrooms:block/wallpaper"
+  },
+  "elements": [
+    {
+      "from": [
+        16.05,
+        0,
+        0
+      ],
+      "to": [
+        16.05,
+        16,
+        16
+      ],
+      "faces": {
+        "east": {
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ],
+          "texture": "#cover"
+        }
+      }
+    }
+  ]
+}

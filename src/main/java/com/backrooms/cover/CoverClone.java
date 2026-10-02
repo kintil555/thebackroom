@@ -20,9 +20,15 @@ import net.minecraft.world.level.block.state.BlockState;
  */
 public final class CoverClone {
 	/** Key di custom_data item: bitmask sisi carpet untuk blok biasa. Screw Piles memakai komponen block_state. */
-	private static final String MASK_KEY = "backrooms_covers";
+	public static final String MASK_KEY = "backrooms_covers";
 
 	private CoverClone() {
+	}
+
+	/** Bitmask sisi carpet yang dibawa item (0 jika tidak ada). Dipakai client untuk menggambar ikon item. */
+	public static int carriedMask(ItemStack stack) {
+		CustomData data = stack.get(DataComponents.CUSTOM_DATA);
+		return data == null ? 0 : data.copyTag().getIntOr(MASK_KEY, 0);
 	}
 
 	/** Ubah hasil pick block menjadi versi berlapis. Stack dikembalikan apa adanya jika blok tidak berlapis. */
