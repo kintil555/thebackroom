@@ -5,7 +5,7 @@ import com.backrooms.block.PanelCover;
 import com.backrooms.cover.CoverManager;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.core.particles.ItemParticleOption;
+import net.minecraft.core.particles.BlockParticleOption;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
@@ -18,7 +18,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(Entity.class)
 public abstract class EntityMixin {
-	/** Berlari di atas sisi atas yang berlapis: partikel memakai tekstur Carpet/Wallpaper, bukan blok di bawahnya. */
+	/**
+	 * Berlari di atas sisi atas yang berlapis: partikel memakai tekstur Carpet/Wallpaper, bukan blok di bawahnya.
+	 * Harus partikel BLOCK (bukan ITEM): ItemParticle menambahkan kecepatan mentah sehingga debu melesat ke atas,
+	 * sedangkan partikel blok menormalkannya seperti vanilla.
+	 */
 	@Inject(method = "spawnSprintParticle", at = @At("HEAD"), cancellable = true)
 	private void backrooms$coverSprintParticle(CallbackInfo ci) {
 		Entity self = (Entity) (Object) this;
@@ -40,7 +44,7 @@ public abstract class EntityMixin {
 			z = Mth.clamp(z, pos.getZ(), pos.getZ() + 1.0);
 		}
 		self.level().addParticle(
-			new ItemParticleOption(ParticleTypes.ITEM, cover == PanelCover.WALLPAPER ? ModBlocks.WALLPAPER : ModBlocks.CARPET),
+			new BlockParticleOption(ParticleTypes.BLOCK, ModBlocks.COVER_DISPLAY.stateFor(Direction.UP, cover)),
 			x, self.getY() + 0.1, z, movement.x * -4.0, 1.5, movement.z * -4.0
 		);
 		ci.cancel();
