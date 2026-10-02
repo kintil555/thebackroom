@@ -3,8 +3,7 @@
   "package": "com.backrooms.mixin.client",
   "compatibilityLevel": "JAVA_25",
   "client": [
-    "LevelRendererMixin",
-    "ModelBlockRendererMixin"
+    "LevelRendererMixin"
   ],
   "injectors": {
     "defaultRequire": 1

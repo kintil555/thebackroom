@@ -2,17 +2,54 @@
   "ambientocclusion": true,
   "textures": {
     "particle": "backrooms:block/carpet",
-    "cover": "backrooms:block/carpet"
+    "cover": "backrooms:block/carpet",
+    "back": "backrooms:block/carpet"
   },
   "elements": [
     {
-      "from": [0, 0, -0.05],
-      "to": [16, 16, -0.05],
+      "from": [
+        0,
+        0,
+        -0.05
+      ],
+      "to": [
+        16,
+        16,
+        -0.05
+      ],
       "faces": {
         "north": {
-          "uv": [0, 0, 16, 16],
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ],
           "texture": "#cover",
           "cullface": "north"
+        }
+      }
+    },
+    {
+      "from": [
+        0,
+        0,
+        -0.04
+      ],
+      "to": [
+        16,
+        16,
+        -0.04
+      ],
+      "faces": {
+        "south": {
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ],
+          "texture": "#back"
         }
       }
     }

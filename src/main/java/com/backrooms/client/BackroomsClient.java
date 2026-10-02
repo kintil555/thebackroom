@@ -1,11 +1,21 @@
 package com.backrooms.client;
 
+import com.backrooms.ModBlocks;
 import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.fabric.api.client.model.loading.v1.ModelLoadingPlugin;
+import net.fabricmc.fabric.api.client.model.loading.v1.ModelModifier;
+import net.minecraft.world.level.block.Block;
 
 public class BackroomsClient implements ClientModInitializer {
 	@Override
 	public void onInitializeClient() {
 		ClientCovers.init();
-		CoverHud.init();
+
+		// Bungkus model semua blok biasa agar carpet (attachment chunk) ikut tergambar. Screw Piles menggambar
+		// lapisannya lewat blockstate sendiri; cover_display tidak boleh dibungkus (dipakai sebagai model lapisan).
+		ModelLoadingPlugin.register(context -> context.modifyBlockModelAfterBake().register(ModelModifier.WRAP_PHASE, (model, modifierContext) -> {
+			Block block = modifierContext.state().getBlock();
+			return block == ModBlocks.COVER_DISPLAY || block == ModBlocks.SCREW_PILES ? model : new CoverBlockStateModel(model);
+		}));
 	}
 }

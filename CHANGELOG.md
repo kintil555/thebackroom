@@ -11,6 +11,9 @@
 - Dihapus: blok Wallpaper dan Carpet lama (panel multi-sisi)
 - Fix cahaya: Screw Piles kini menahan cahaya penuh (sebelumnya bocor menembus dinding karena noOcclusion), sisi antar Screw Piles tidak digambar
 - Fix tampilan: model lapisan memakai ambient occlusion yang sama dengan blok pemiliknya dan offset lebih tebal (anti z-fighting)
-- Nama blok berlapis ditampilkan di bawah crosshair: "Screw Piles Attached Wallpaper", "<Blok> Attached Carpet"
+- Middle click blok berlapis meng-clone item blok itu beserta lapisannya, bernama "Screw Piles Attached Wallpaper", "<Blok> Attached Carpet", dst. Dipasang kembali, blok + lapisannya muncul bersamaan
+- Dihapus: HUD nama blok di bawah crosshair
+- Fix: Carpet di blok selain Screw Piles tidak tergambar. Fabric mengalihkan render terrain dari ModelBlockRenderer, jadi mixin lama tidak pernah jalan; kini memakai pembungkus model Fabric (emitQuads)
+- Fix culling: lapisan punya sisi belakang. Dilihat dari belakang (mis. lewat lubang Screw Piles): Wallpaper menampilkan oak planks, Carpet menampilkan carpet
 - Blok baru: Ceiling. Item baru: Wallpapers (creative only, Screw Piles dengan 6 sisi berwallpaper)
 - Texture baru untuk Carpet dan Ceiling

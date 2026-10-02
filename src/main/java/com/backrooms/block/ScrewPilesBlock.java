@@ -52,6 +52,10 @@ public class ScrewPilesBlock extends Block {
 		}
 	}
 
+	public static EnumProperty<PanelCover> coverProperty(Direction face) {
+		return COVERS.get(face);
+	}
+
 	public static PanelCover getCover(BlockState state, Direction face) {
 		return state.getValue(COVERS.get(face));
 	}

@@ -8,6 +8,8 @@ Mod bertema Backrooms. Tahap ini: blok dekorasi saja (dimensi menyusul).
 | Wallpaper | Item. Klik kanan sisi Screw Piles -> tekstur menempel di face itu. Break (bidik sisi berlapis) butuh 4 detik, hanya lapisan yang lepas |
 | Carpet | Item. Klik kanan sisi penuh blok mana pun -> menempel di face itu (disimpan di data chunk, bukan blok terpisah). Break hanya melepas carpet, blok tetap |
 
+Middle click blok berlapis meng-clone blok itu beserta lapisannya (contoh: "Stone Attached Carpet").
+
 Retak (crack) dan partikel saat break hanya muncul di sisi yang berlapis. Jika blok pemilik carpet dihancurkan/diganti, carpet ikut jatuh.
 
 Item ada di creative tab **Building Blocks**.

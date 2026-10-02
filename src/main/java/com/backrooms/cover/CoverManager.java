@@ -64,6 +64,15 @@ public final class CoverManager {
 		chunk.markUnsaved();
 	}
 
+	/**
+	 * Pasang carpet pada sisi-sisi (bitmask) blok yang baru ditaruh. Sisi yang tidak penuh di state baru
+	 * langsung dilepas dan dijatuhkan lewat {@link #onHostChanged}.
+	 */
+	public static void applyMask(ServerLevel level, BlockPos pos, BlockState state, int mask) {
+		setMask(level, pos, mask | mask(level, pos));
+		onHostChanged(level, level.getChunkAt(pos), pos, state);
+	}
+
 	/** Klik kanan carpet pada sisi blok biasa: carpet menempel di sisi itu. */
 	public static InteractionResult tryApplyCarpet(UseOnContext context) {
 		Level level = context.getLevel();
