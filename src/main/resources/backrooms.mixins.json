@@ -5,6 +5,7 @@
   "mixins": [
     "BlockItemMixin",
     "BlockStateBaseMixin",
+    "EntityMixin",
     "LevelChunkMixin"
   ],
   "injectors": {
