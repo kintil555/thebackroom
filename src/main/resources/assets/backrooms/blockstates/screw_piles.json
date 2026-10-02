@@ -1,8 +1,54 @@
 {
   "multipart": [
     {
+      "when": {
+        "north": "none"
+      },
       "apply": {
-        "model": "backrooms:block/screw_piles"
+        "model": "backrooms:block/screw_piles_face_side"
+      }
+    },
+    {
+      "when": {
+        "east": "none"
+      },
+      "apply": {
+        "model": "backrooms:block/screw_piles_face_side",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "south": "none"
+      },
+      "apply": {
+        "model": "backrooms:block/screw_piles_face_side",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "west": "none"
+      },
+      "apply": {
+        "model": "backrooms:block/screw_piles_face_side",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "up": "none"
+      },
+      "apply": {
+        "model": "backrooms:block/screw_piles_face_top"
+      }
+    },
+    {
+      "when": {
+        "down": "none"
+      },
+      "apply": {
+        "model": "backrooms:block/screw_piles_face_bottom"
       }
     },
     {

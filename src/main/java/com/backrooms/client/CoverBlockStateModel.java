@@ -27,11 +27,13 @@ public final class CoverBlockStateModel extends WrapperBlockStateModel {
 	public void emitQuads(
 		QuadEmitter emitter, BlockAndTintGetter level, BlockPos pos, BlockState state, RandomSource random, Predicate<@Nullable Direction> cullTest
 	) {
-		super.emitQuads(emitter, level, pos, state, random, cullTest);
 		int mask = ClientCovers.mask(pos);
 		if (mask == 0) {
+			super.emitQuads(emitter, level, pos, state, random, cullTest);
 			return;
 		}
+		// Cover menempel rata dengan permukaan blok, jadi sisi blok di bawahnya tidak digambar (anti z-fighting).
+		super.emitQuads(emitter, level, pos, state, random, face -> (face != null && (mask & CoverManager.bit(face)) != 0) || cullTest.test(face));
 		for (Direction face : Direction.values()) {
 			if ((mask & CoverManager.bit(face)) != 0) {
 				CoverModels.get(face, PanelCover.CARPET).emitQuads(emitter, level, pos, state, random, cullTest);
