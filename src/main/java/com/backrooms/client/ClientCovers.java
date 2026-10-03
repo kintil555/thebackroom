@@ -66,6 +66,7 @@ public final class ClientCovers {
 	private static void poll(Minecraft minecraft) {
 		if (minecraft.level == null) {
 			LEVELS.clear();
+			com.backrooms.cover.PendingCoverData.clear();
 			return;
 		}
 		if (++pollCounter < POLL_INTERVAL_TICKS) {

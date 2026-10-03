@@ -3,7 +3,10 @@ package com.backrooms.block;
 import com.backrooms.ModBlockEntities;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
+import com.backrooms.cover.PendingCoverData;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.NbtOps;
+import net.minecraft.world.level.Level;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
@@ -49,6 +52,20 @@ public class CoveredBlockEntity extends BlockEntity {
 		this.setChanged();
 		if (this.level != null) {
 			this.level.sendBlockUpdated(this.worldPosition, this.getBlockState(), this.getBlockState(), Block.UPDATE_ALL);
+		}
+	}
+
+	/** Client: terapkan data yang tiba lebih dulu daripada block entity ini (lihat PendingCoverData). */
+	@Override
+	public void setLevel(Level level) {
+		super.setLevel(level);
+		if (level.isClientSide()) {
+			CompoundTag pending = PendingCoverData.take(this.worldPosition);
+			if (pending != null) {
+				this.host = pending.get("host") == null ? null : BlockState.CODEC.parse(NbtOps.INSTANCE, pending.get("host")).result().orElse(null);
+				this.mask = pending.getIntOr("mask", 0);
+				level.sendBlockUpdated(this.worldPosition, this.getBlockState(), this.getBlockState(), Block.UPDATE_IMMEDIATE);
+			}
 		}
 	}
 
