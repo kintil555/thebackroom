@@ -6,6 +6,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.RandomSource;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
@@ -31,6 +32,8 @@ public class SirenBlock extends Block implements EntityBlock {
 
 	/** Jangkauan (blok) sirine yang ikut dibunyikan oleh sebuah Magnet. */
 	public static final int RANGE = 16;
+	/** Lama sirine berbunyi sejak menyala: 18 detik (tidak ikut berhenti saat portal terbuka). */
+	public static final int ACTIVE_TICKS = 360;
 	public SirenBlock(Properties properties) {
 		super(properties);
 		registerDefaultState(defaultBlockState().setValue(ACTIVE, false).setValue(FACING, Direction.UP));
@@ -50,6 +53,14 @@ public class SirenBlock extends Block implements EntityBlock {
 	@Override
 	public @Nullable BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
 		return new SirenBlockEntity(pos, state);
+	}
+
+	/** Waktu habis: matikan sirine ini (client fade out lalu berhenti). */
+	@Override
+	protected void tick(BlockState state, ServerLevel level, BlockPos pos, RandomSource random) {
+		if (state.getValue(ACTIVE)) {
+			level.setBlock(pos, state.setValue(ACTIVE, false), Block.UPDATE_ALL);
+		}
 	}
 
 	/** Alarm dimainkan di client (SirenAlarmSound) agar bisa fade in/out dan pitch naik; server tidak lagi memutar suara. */
@@ -74,9 +85,12 @@ public class SirenBlock extends Block implements EntityBlock {
 				continue;
 			}
 			BlockState state = level.getBlockState(pos);
-			if (state.getBlock() instanceof SirenBlock && state.getValue(ACTIVE) != active) {
+			if (state.getBlock() instanceof SirenBlock siren && state.getValue(ACTIVE) != active) {
 				BlockPos target = pos.immutable();
 				level.setBlock(target, state.setValue(ACTIVE, active), Block.UPDATE_ALL);
+				if (active) {
+					level.scheduleTick(target, siren, ACTIVE_TICKS);
+				}
 			}
 		}
 	}

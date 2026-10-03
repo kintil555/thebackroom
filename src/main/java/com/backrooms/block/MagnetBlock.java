@@ -141,7 +141,11 @@ public class MagnetBlock extends Block {
 			return;
 		}
 		level.setBlock(pos, state.setValue(ACTIVE, false).setValue(WARNING, false), Block.UPDATE_ALL);
-		SirenBlock.setNearby(level, frame != null ? frame.center() : pos, false);
+		if (frame == null) {
+			// Bingkai rusak sebelum portal terbuka: batalkan, sirine langsung mati. Jika portal terbuka, sirine
+			// berhenti sendiri setelah SirenBlock.ACTIVE_TICKS sejak menyala.
+			SirenBlock.setNearby(level, pos, false);
+		}
 		// Bingkai masih utuh: buka (daya boleh hanya pulsa). Tick Magnet lain menemukan ruang sudah terisi, jadi tidak ganda.
 		if (frame != null) {
 			frame.openPortal(level);
