@@ -18,7 +18,10 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.world.phys.Vec3;
 import org.jspecify.annotations.Nullable;
 
-/** Menggambar sinar lampu sirine (spinning light) yang berputar di sumbu Y selama blok aktif. */
+/**
+ * Menggambar sinar lampu sirine (spinning light) yang berputar di sumbu Y selama blok aktif.
+ * Memakai pipeline {@code eyes}: emissive penuh dan tanpa cardinal lighting (tidak ada shading per sisi).
+ */
 public class SirenRenderer implements BlockEntityRenderer<SirenBlockEntity, SirenRenderer.State> {
 	private static final Identifier LIGHT = Identifier.fromNamespaceAndPath(BackroomsMod.MOD_ID, "textures/block/siren_light.png");
 	/** Putaran (derajat) per tick. */
@@ -71,7 +74,7 @@ public class SirenRenderer implements BlockEntityRenderer<SirenBlockEntity, Sire
 		poseStack.translate(PIVOT_X, 0.0F, PIVOT_Z);
 		poseStack.mulPose(Axis.YP.rotationDegrees(state.angle));
 		poseStack.translate(-PIVOT_X, 0.0F, -PIVOT_Z);
-		collector.submitCustomGeometry(poseStack, RenderTypes.entityTranslucentEmissive(LIGHT), (pose, buffer) -> {
+		collector.submitCustomGeometry(poseStack, RenderTypes.eyes(LIGHT), (pose, buffer) -> {
 			// Dua sisi (urutan vertex dibalik) agar terlihat dari depan maupun belakang.
 			quad(pose, buffer, U_FRONT_0, U_FRONT_1, false);
 			quad(pose, buffer, U_BACK_0, U_BACK_1, true);
