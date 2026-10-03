@@ -15,6 +15,7 @@ public class BackroomsMod implements ModInitializer {
 	@Override
 	public void onInitialize() {
 		CoverAttachments.init();
+		ModSounds.init();
 		ModBlocks.init();
 
 		// Break pada sisi berlapis hanya melepas lapisannya; blok yang dilapisi tetap berdiri.

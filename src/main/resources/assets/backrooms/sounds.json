@@ -1,0 +1,10 @@
+{
+  "lamp_flicker": {
+    "subtitle": "subtitles.backrooms.lamp_flicker",
+    "sounds": [
+      { "name": "backrooms:lamp_flicker", "pitch": 0.9 },
+      { "name": "backrooms:lamp_flicker", "pitch": 1.0 },
+      { "name": "backrooms:lamp_flicker", "pitch": 1.1 }
+    ]
+  }
+}
