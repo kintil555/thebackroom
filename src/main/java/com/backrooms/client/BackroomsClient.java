@@ -15,6 +15,9 @@ public class BackroomsClient implements ClientModInitializer {
 		// lapisannya lewat blockstate sendiri; cover_display tidak boleh dibungkus (dipakai sebagai model lapisan).
 		ModelLoadingPlugin.register(context -> context.modifyBlockModelAfterBake().register(ModelModifier.WRAP_PHASE, (model, modifierContext) -> {
 			Block block = modifierContext.state().getBlock();
+			if (block == ModBlocks.COVERED_BLOCK) {
+				return new CoveredBlockStateModel(model);
+			}
 			return block == ModBlocks.COVER_DISPLAY || block == ModBlocks.SCREW_PILES ? model : new CoverBlockStateModel(model);
 		}));
 	}

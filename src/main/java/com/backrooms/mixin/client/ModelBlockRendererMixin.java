@@ -35,7 +35,7 @@ public abstract class ModelBlockRendererMixin {
 		if (this.backrooms$drawingCover) {
 			return;
 		}
-		int mask = ClientCovers.mask(pos);
+		int mask = ClientCovers.mask(level, pos);
 		if (mask == 0) {
 			return;
 		}

@@ -8,6 +8,7 @@
     "ItemModelResolverMixin",
     "LevelRendererMixin",
     "MultiPlayerGameModeMixin",
+    "RenderSectionRegionAccessor",
     "SimpleSoundInstanceMixin"
   ],
   "injectors": {

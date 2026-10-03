@@ -27,7 +27,7 @@ public final class CoverBlockStateModel extends WrapperBlockStateModel {
 	public void emitQuads(
 		QuadEmitter emitter, BlockAndTintGetter level, BlockPos pos, BlockState state, RandomSource random, Predicate<@Nullable Direction> cullTest
 	) {
-		int mask = ClientCovers.mask(pos);
+		int mask = ClientCovers.mask(level, pos);
 		if (mask == 0) {
 			super.emitQuads(emitter, level, pos, state, random, cullTest);
 			return;
@@ -44,6 +44,6 @@ public final class CoverBlockStateModel extends WrapperBlockStateModel {
 	/** Geometri blok berlapis berbeda per posisi, jadi tidak boleh di-cache berdasarkan key model saja. */
 	@Override
 	public @Nullable Object createGeometryKey(BlockAndTintGetter level, BlockPos pos, BlockState state, RandomSource random) {
-		return ClientCovers.mask(pos) == 0 ? super.createGeometryKey(level, pos, state, random) : null;
+		return ClientCovers.mask(level, pos) == 0 ? super.createGeometryKey(level, pos, state, random) : null;
 	}
 }

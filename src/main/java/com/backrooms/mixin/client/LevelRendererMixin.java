@@ -1,5 +1,6 @@
 package com.backrooms.mixin.client;
 
+import com.backrooms.block.CoveredBlock;
 import com.backrooms.block.PanelCover;
 import com.backrooms.client.CoverModels;
 import com.backrooms.cover.CoverManager;
@@ -19,6 +20,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.block.RenderShape;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
@@ -51,6 +53,10 @@ public abstract class LevelRendererMixin {
 		boolean anyCovered = false;
 		for (BlockBreakingRenderState state : levelRenderState.blockBreakingRenderStates) {
 			Direction face = backrooms$aimedFace(state.blockPos());
+			if (CoveredBlock.hostOf(level, state.blockPos()) != null) {
+				anyCovered = true;
+				break;
+			}
 			if (face != null && CoverManager.coverAt(level, state.blockPos(), state.blockState(), face) != PanelCover.NONE) {
 				anyCovered = true;
 				break;
@@ -74,8 +80,9 @@ public abstract class LevelRendererMixin {
 			poseStack.pushPose();
 			poseStack.translate(pos.getX() - cameraPos.x(), pos.getY() - cameraPos.y(), pos.getZ() - cameraPos.z());
 			poseStack.translate(state.blockState().getOffset(pos));
+			BlockState host = CoveredBlock.hostOf(level, pos);
 			BlockStateModel model = cover == PanelCover.NONE
-				? this.modelManager.getBlockStateModelSet().get(state.blockState())
+				? this.modelManager.getBlockStateModelSet().get(host != null ? host : state.blockState())
 				: CoverModels.get(face, cover);
 			random.setSeed(state.blockState().getSeed(pos));
 			model.collectParts(random, parts);

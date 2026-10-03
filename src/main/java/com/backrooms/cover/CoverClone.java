@@ -1,6 +1,7 @@
 package com.backrooms.cover;
 
 import com.backrooms.ModBlocks;
+import com.backrooms.block.CoveredBlock;
 import com.backrooms.block.PanelCover;
 import com.backrooms.block.ScrewPilesBlock;
 import net.minecraft.core.BlockPos;
@@ -35,6 +36,10 @@ public final class CoverClone {
 	public static ItemStack applyToPick(Level level, BlockPos pos, BlockState state, ItemStack stack) {
 		if (stack.isEmpty()) {
 			return stack;
+		}
+		BlockState host = CoveredBlock.hostOf(level, pos);
+		if (host != null) {
+			state = host; // blok pembungkus: nama & jenis mengikuti blok asal
 		}
 		boolean wallpaper = false;
 		boolean carpet = false;

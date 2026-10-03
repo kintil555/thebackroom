@@ -22,6 +22,7 @@ public class BackroomsMod implements ModInitializer {
 		CoverAttachments.init();
 		ModSounds.init();
 		ModBlocks.init();
+		ModBlockEntities.init();
 
 		// Break pada sisi berlapis hanya melepas lapisannya; blok yang dilapisi tetap berdiri.
 		PlayerBlockBreakEvents.BEFORE.register((level, player, pos, state, blockEntity) -> {

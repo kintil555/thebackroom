@@ -1,6 +1,7 @@
 package com.backrooms;
 
 import com.backrooms.block.CoverDisplayBlock;
+import com.backrooms.block.CoveredBlock;
 import com.backrooms.block.LampBlock;
 import com.backrooms.block.ScrewPilesBlock;
 import com.backrooms.item.CarpetItem;
@@ -60,6 +61,13 @@ public final class ModBlocks {
 		"cover_display",
 		CoverDisplayBlock::new,
 		BlockBehaviour.Properties.of().noCollision().noOcclusion().noLootTable()
+	);
+
+	/** Pembungkus blok biasa yang ditempeli carpet; blok asal + sisi carpet disimpan di block entity (tanpa item). */
+	public static final Block COVERED_BLOCK = registerBlock(
+		"covered_block",
+		CoveredBlock::new,
+		BlockBehaviour.Properties.of().strength(1.0F, 3.0F).sound(SoundType.WOOL).noLootTable()
 	);
 
 	/** Wallpaper dan Carpet hanya item: lapisannya disimpan di Screw Piles (blockstate) atau chunk (attachment). */
