@@ -21,11 +21,13 @@ import org.jspecify.annotations.Nullable;
 /**
  * Magnet: bagian bingkai portal ({@link MagnetFrame}). Jika bingkai lengkap dan salah satu Magnet dialiri
  * redstone power 15, sirine di sekitar berbunyi {@link #WARNING_TICKS}, lalu portal 3x5 terbuka di dalam bingkai.
- * Sisi menjorok Magnet (FACING) menghadap ke dalam bingkai: kolom kiri/kanan menghadap horizontal ke tengah,
- * baris atas menghadap {@link Direction#DOWN}.
+ * Sisi menjorok Magnet (FACING) menghadap pemain saat dipasang. Kolom kiri/kanan harus menghadap ke tengah bingkai;
+ * baris atas (HANGING) diputar mengikuti arah pemain.
  */
 public class MagnetBlock extends Block {
-	public static final EnumProperty<Direction> FACING = BlockStateProperties.FACING;
+	public static final EnumProperty<Direction> FACING = BlockStateProperties.HORIZONTAL_FACING;
+	/** True untuk Magnet baris atas bingkai (tergantung di langit-langit); FACING tetap mengikuti arah pemain. */
+	public static final BooleanProperty HANGING = BooleanProperty.create("hanging");
 	/** True selama hitung mundur sebelum portal terbuka (dipasang di semua Magnet pada bingkai). */
 	public static final BooleanProperty ACTIVE = BooleanProperty.create("active");
 
@@ -40,25 +42,26 @@ public class MagnetBlock extends Block {
 
 	public MagnetBlock(Properties properties) {
 		super(properties);
-		registerDefaultState(defaultBlockState().setValue(FACING, Direction.NORTH).setValue(ACTIVE, false).setValue(WARNING, false));
+		registerDefaultState(defaultBlockState().setValue(FACING, Direction.NORTH).setValue(HANGING, false).setValue(ACTIVE, false).setValue(WARNING, false));
 	}
 
 	@Override
 	protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
-		builder.add(FACING, ACTIVE, WARNING);
+		builder.add(FACING, HANGING, ACTIVE, WARNING);
 	}
 
 	@Override
 	public @Nullable BlockState getStateForPlacement(BlockPlaceContext context) {
 		Direction clickedFace = context.getClickedFace();
-		boolean topRow = clickedFace == Direction.DOWN;
-		if (!topRow && clickedFace.getAxis().isHorizontal()) {
-			// Disambung ke samping Magnet baris atas (menghadap bawah): ikut menghadap bawah.
+		boolean hanging = clickedFace == Direction.DOWN;
+		if (!hanging && clickedFace.getAxis().isHorizontal()) {
+			// Disambung ke samping Magnet baris atas: ikut tergantung.
 			BlockState clicked = context.getLevel().getBlockState(context.getClickedPos().relative(clickedFace.getOpposite()));
-			topRow = clicked.getBlock() instanceof MagnetBlock && clicked.getValue(FACING) == Direction.DOWN;
+			hanging = clicked.getBlock() instanceof MagnetBlock && clicked.getValue(HANGING);
 		}
-		Direction facing = topRow ? Direction.DOWN : context.getHorizontalDirection().getOpposite();
-		return defaultBlockState().setValue(FACING, facing);
+		return defaultBlockState()
+			.setValue(FACING, context.getHorizontalDirection().getOpposite())
+			.setValue(HANGING, hanging);
 	}
 
 	@Override

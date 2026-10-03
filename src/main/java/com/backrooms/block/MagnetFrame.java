@@ -18,8 +18,8 @@ import org.jspecify.annotations.Nullable;
  * koordinat (a, h): a = geser sepanjang {@link #right}, h = naik dari {@link #base}.
  * - Magnet: kolom kiri (a=-1) dan kanan (a=WIDTH) setinggi portal, plus baris atas (h=HEIGHT). Sudut tidak perlu.
  * - Bawah (h=-1): blok apa saja asal bukan udara/replaceable.
- * - Sisi magnet yang menjorok (FACING) di kolom kiri/kanan harus menghadap ke dalam (horizontal ke tengah), dan
- *   baris atas harus menghadap ke bawah ({@link Direction#DOWN}).
+ * - Sisi magnet yang menjorok (FACING) di kolom kiri/kanan harus menghadap ke dalam (horizontal ke tengah).
+ *   Baris atas harus HANGING; arah putarnya bebas (mengikuti pemain).
  */
 public record MagnetFrame(BlockPos base, Direction right, List<BlockPos> magnets) {
 	public static final int WIDTH = 3;
@@ -77,7 +77,10 @@ public record MagnetFrame(BlockPos base, Direction right, List<BlockPos> magnets
 			}
 			Direction facing = state.getValue(MagnetBlock.FACING);
 			boolean topRow = offset[1] == HEIGHT;
-			if (topRow ? facing != Direction.DOWN : a == -1 && facing != right || a == WIDTH && facing != right.getOpposite()) {
+			if (state.getValue(MagnetBlock.HANGING) != topRow) {
+				return null;
+			}
+			if (!topRow && (a == -1 && facing != right || a == WIDTH && facing != right.getOpposite())) {
 				return null;
 			}
 			magnets.add(magnetPos);
@@ -131,9 +134,11 @@ public record MagnetFrame(BlockPos base, Direction right, List<BlockPos> magnets
 				continue;
 			}
 			Direction facing = state.getValue(MagnetBlock.FACING);
-			Direction expected = offset[1] == HEIGHT ? Direction.DOWN : a == -1 ? right : right.getOpposite();
-			if (facing != expected) {
-				problems.add("Magnet " + magnetPos.toShortString() + " menghadap " + facing + ", harus " + expected);
+			boolean topRow = offset[1] == HEIGHT;
+			if (state.getValue(MagnetBlock.HANGING) != topRow) {
+				problems.add("Magnet " + magnetPos.toShortString() + (topRow ? " harus tergantung (klik sisi bawah blok)" : " tidak boleh tergantung"));
+			} else if (!topRow && facing != (a == -1 ? right : right.getOpposite())) {
+				problems.add("Magnet " + magnetPos.toShortString() + " menghadap " + facing + ", harus " + (a == -1 ? right : right.getOpposite()));
 			}
 		}
 		return problems;
