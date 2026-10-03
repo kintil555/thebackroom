@@ -19,6 +19,10 @@ import org.jspecify.annotations.Nullable;
 public final class PortalGlowManager {
 	/** Cek bingkai masih utuh tiap sekian tick (MagnetFrame.find memindai puluhan posisi). */
 	private static final int VALIDATE_INTERVAL_TICKS = 10;
+	/** Sumber dipertahankan sebanyak ini setelah portal terbuka agar glow bisa meredup dan efek kamera memudar. */
+	public static final int AFTER_OPEN_TICKS = 200;
+	/** Toleransi menunggu paket blok portal tiba setelah durasi pengisian habis. */
+	private static final int OPEN_GRACE_TICKS = 40;
 
 	private static final List<Source> SOURCES = new ArrayList<>();
 
@@ -33,6 +37,8 @@ public final class PortalGlowManager {
 		final int durationTicks;
 		/** Pergeseran pola kedip (radian), turunan dari posisi agar tiap portal berkedip berbeda. */
 		final float seed;
+		/** Tick game saat client melihat portal terbuka; -1 selama masih mengisi energi. */
+		long openedTick = -1L;
 		/** Keterlihatan hasil smoothing 0..1: turun saat tengah portal terhalang blok dari kamera. */
 		float visibility;
 
@@ -72,11 +78,16 @@ public final class PortalGlowManager {
 		Iterator<Source> iterator = SOURCES.iterator();
 		while (iterator.hasNext()) {
 			Source source = iterator.next();
-			boolean expired = now - source.startTick >= source.durationTicks;
-			boolean opened = level.getBlockState(source.center).is(ModBlocks.PLACEHOLDER_PORTAL);
-			boolean broken = !expired && !opened && (now - source.startTick) % VALIDATE_INTERVAL_TICKS == 0
+			if (source.openedTick < 0L && level.getBlockState(source.center).is(ModBlocks.PLACEHOLDER_PORTAL)) {
+				source.openedTick = now;
+			}
+			boolean opened = source.openedTick >= 0L;
+			boolean charging = !opened && now - source.startTick < source.durationTicks;
+			boolean finished = opened && now - source.openedTick >= AFTER_OPEN_TICKS;
+			boolean neverOpened = !opened && now - source.startTick >= source.durationTicks + OPEN_GRACE_TICKS;
+			boolean broken = charging && (now - source.startTick) % VALIDATE_INTERVAL_TICKS == 0
 				&& MagnetFrame.find(level, source.leader, false) == null;
-			if (expired || opened || broken) {
+			if (finished || neverOpened || broken) {
 				iterator.remove();
 			}
 		}

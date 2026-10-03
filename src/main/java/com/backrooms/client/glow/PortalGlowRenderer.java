@@ -41,6 +41,8 @@ import org.joml.Vector4f;
 public final class PortalGlowRenderer {
 	private static final int MAX_SOURCES = 4;
 	private static final int DATA_WIDTH = 3;
+	/** Baris terakhir tekstur data = parameter efek kamera (warp/blur), bukan sumber glow. */
+	private static final int DATA_HEIGHT = MAX_SOURCES + 1;
 
 	/** Tempat tekstur data didaftarkan. PostChain me-resolve input tekstur ke {@code textures/effect/<path>.png}. */
 	private static final Identifier DATA_TEXTURE_ID = Identifier.fromNamespaceAndPath(BackroomsMod.MOD_ID, "textures/effect/portal_glow_data.png");
@@ -50,12 +52,21 @@ public final class PortalGlowRenderer {
 	private static final Identifier SWAP = Identifier.fromNamespaceAndPath(BackroomsMod.MOD_ID, "portal_glow_swap");
 
 	// --- Tampilan: ubah di sini untuk menyetel glow ---
-	/** Radius glow (blok, di dunia) di awal dan tambahan saat energi penuh. */
-	private static final float BASE_RADIUS_BLOCKS = 2.6f;
-	private static final float GROW_RADIUS_BLOCKS = 1.0f;
-	/** Kecerahan awal (0..1 dari penuh) yang naik halus sampai 1.0 menjelang portal terbuka. */
-	private static final float MIN_ENVELOPE = 0.6f;
+	// Fase isi energi: glow muncul perlahan, makin lebar dan makin terang sampai portal terbuka.
+	private static final float START_RADIUS_BLOCKS = 0.5f;
+	private static final float PEAK_RADIUS_BLOCKS = 7.0f;
+	private static final float START_INTENSITY = 0.04f;
+	private static final float PEAK_INTENSITY = 1.0f;
+	/** Eksponen kurva naik (>1 = awal pelan, akhir cepat). */
+	private static final float RISE_CURVE = 1.6f;
+	// Fase setelah portal terbuka: radius mengecil dan intensitas turun perlahan.
+	private static final float END_RADIUS_BLOCKS = 1.2f;
+	private static final float GLOW_DECAY_TICKS = 160.0f;
 	private static final float FADE_IN_TICKS = 8.0f;
+	// Efek kamera (distorsi + blur) di dekat portal.
+	private static final float WARP_RANGE_BLOCKS = 7.0f;
+	/** Kekuatan penuh selama ini setelah portal menyala, lalu memudar sampai AFTER_OPEN_TICKS habis. */
+	private static final float WARP_HOLD_TICKS = 40.0f;
 	/** Warna tint glow (putih hangat kekuningan). */
 	private static final int TINT_R = 255;
 	private static final int TINT_G = 236;
@@ -102,19 +113,21 @@ public final class PortalGlowRenderer {
 		double nowTicks = level.getGameTime() + deltaTracker.getGameTimeDeltaPartialTick(false);
 		Camera camera = minecraft.gameRenderer.mainCamera();
 		List<Glow> glows = new ArrayList<>(sources.size());
+		float warp = 0.0f;
 		for (PortalGlowManager.Source source : sources) {
 			Glow glow = evaluate(source, level, player, camera, nowTicks, frameSeconds, main.width, main.height);
 			if (glow != null) {
 				glows.add(glow);
 			}
+			warp = Math.max(warp, warpAmount(source, camera, nowTicks));
 		}
-		if (glows.isEmpty() || !ensureResources(minecraft)) {
+		if ((glows.isEmpty() && warp <= 0.001f) || !ensureResources(minecraft)) {
 			return;
 		}
 
 		// Yang paling dekat (radius layar terbesar) lebih dulu: hanya MAX_SOURCES baris yang muat di tekstur data.
 		glows.sort(Comparator.comparingDouble(Glow::radius).reversed());
-		writeData(glows);
+		writeData(glows, warp, (float) (nowTicks / 80.0 % 1.0));
 		chain.process(main, pool);
 	}
 
@@ -139,19 +152,40 @@ public final class PortalGlowRenderer {
 
 		double elapsedTicks = nowTicks - source.startTick;
 		float progress = Mth.clamp((float) (elapsedTicks / source.durationTicks), 0.0f, 1.0f);
-		float radiusBlocks = BASE_RADIUS_BLOCKS + GROW_RADIUS_BLOCKS * progress;
+		float rise = (float) Math.pow(PortalGlowFlicker.smooth(1.0f, progress), RISE_CURVE);
+		float radiusBlocks = Mth.lerp(rise, START_RADIUS_BLOCKS, PEAK_RADIUS_BLOCKS);
+		float envelope = Mth.lerp(rise, START_INTENSITY, PEAK_INTENSITY);
+		float flicker = PortalGlowFlicker.value(nowTicks / 20.0, source.seed);
+
+		if (source.openedTick >= 0L) {
+			float decay = PortalGlowFlicker.smooth(GLOW_DECAY_TICKS, (float) Math.max(0.0, nowTicks - source.openedTick));
+			radiusBlocks = Mth.lerp(decay, PEAK_RADIUS_BLOCKS, END_RADIUS_BLOCKS);
+			envelope = PEAK_INTENSITY * (1.0f - decay);
+			flicker = Mth.lerp(decay, flicker, 1.0f);
+		}
 		float[] projected = project(camera, target, radiusBlocks, width, height);
 		if (projected == null) {
 			return null;
 		}
 
-		float envelope = Mth.lerp(PortalGlowFlicker.smooth(1.0f, progress), MIN_ENVELOPE, 1.0f);
 		float fadeIn = PortalGlowFlicker.smooth(FADE_IN_TICKS, (float) elapsedTicks);
-		float flicker = PortalGlowFlicker.value(nowTicks / 20.0, source.seed);
 		float near = Mth.clamp((float) Math.sqrt(distanceSq) / NEAR_DISTANCE_BLOCKS, MIN_NEAR_FACTOR, 1.0f);
 		float intensity = envelope * flicker * fadeIn * near * source.visibility;
 
 		return new Glow(projected[0] / width, projected[1] / height, Math.min(1.0f, projected[2] / height), intensity);
+	}
+
+	/** Kekuatan distorsi+blur 0..1: hanya setelah portal terbuka, penuh sebentar lalu memudar, dan makin kuat saat player mendekat. */
+	private static float warpAmount(PortalGlowManager.Source source, Camera camera, double nowTicks) {
+		if (source.openedTick < 0L) {
+			return 0.0f;
+		}
+		float since = (float) (nowTicks - source.openedTick);
+		float fadeTicks = PortalGlowManager.AFTER_OPEN_TICKS - WARP_HOLD_TICKS;
+		float time = since <= WARP_HOLD_TICKS ? 1.0f : 1.0f - PortalGlowFlicker.smooth(fadeTicks, since - WARP_HOLD_TICKS);
+		float distance = (float) camera.position().distanceTo(Vec3.atCenterOf(source.center));
+		float near = Mth.clamp(1.0f - distance / WARP_RANGE_BLOCKS, 0.0f, 1.0f);
+		return time * near * near * (3.0f - 2.0f * near);
 	}
 
 	/** Proyeksi titik dunia ke piksel layar (asal kiri-atas) beserta radius piksel pada kedalaman itu; null jika di luar pandangan. */
@@ -173,7 +207,7 @@ public final class PortalGlowRenderer {
 		return new float[] {px, py, radius};
 	}
 
-	private static void writeData(List<Glow> glows) {
+	private static void writeData(List<Glow> glows, float warp, float phase) {
 		NativeImage image = dataTexture.getPixels();
 		int tint = abgr(TINT_R, TINT_G, TINT_B, 255);
 		for (int row = 0; row < MAX_SOURCES; row++) {
@@ -192,6 +226,12 @@ public final class PortalGlowRenderer {
 			image.setPixelABGR(1, row, abgr(radius >> 8, radius & 0xFF, intensity >> 8, intensity & 0xFF));
 			image.setPixelABGR(2, row, tint);
 		}
+		// Baris parameter kamera: texel 0 = warp (16 bit) + blur (16 bit), texel 1 = fase waktu 0..1 (16 bit).
+		int warpBits = encode16(warp);
+		int phaseBits = encode16(phase);
+		image.setPixelABGR(0, MAX_SOURCES, abgr(warpBits >> 8, warpBits & 0xFF, warpBits >> 8, warpBits & 0xFF));
+		image.setPixelABGR(1, MAX_SOURCES, abgr(phaseBits >> 8, phaseBits & 0xFF, 0, 255));
+		image.setPixelABGR(2, MAX_SOURCES, 0);
 		dataTexture.upload();
 	}
 
@@ -209,7 +249,7 @@ public final class PortalGlowRenderer {
 			return true;
 		}
 		try {
-			dataTexture = new DynamicTexture("backrooms portal glow data", DATA_WIDTH, MAX_SOURCES, true);
+			dataTexture = new DynamicTexture("backrooms portal glow data", DATA_WIDTH, DATA_HEIGHT, true);
 			minecraft.getTextureManager().register(DATA_TEXTURE_ID, dataTexture);
 			projectionBuffer = new ProjectionMatrixBuffer("backrooms_portal_glow");
 			chain = PostChain.load(buildConfig(), minecraft.getTextureManager(), LevelTargetBundle.MAIN_TARGETS,
@@ -227,8 +267,8 @@ public final class PortalGlowRenderer {
 	/** main -> portal_glow.fsh -> swap -> blit -> main (vanilla tidak pernah membaca dan menulis target yang sama dalam satu pass). */
 	private static PostChainConfig buildConfig() {
 		List<PostChainConfig.Input> inputs = List.of(
-			new PostChainConfig.TargetInput("In", MAIN, false, false),
-			new PostChainConfig.TextureInput("Data", DATA_INPUT_ID, DATA_WIDTH, MAX_SOURCES, false)
+			new PostChainConfig.TargetInput("In", MAIN, false, true),
+			new PostChainConfig.TextureInput("Data", DATA_INPUT_ID, DATA_WIDTH, DATA_HEIGHT, false)
 		);
 		PostChainConfig.Pass glowPass = new PostChainConfig.Pass(
 			SCREENQUAD, Identifier.fromNamespaceAndPath(BackroomsMod.MOD_ID, "post/portal_glow"), inputs, SWAP, new LinkedHashMap<>());
