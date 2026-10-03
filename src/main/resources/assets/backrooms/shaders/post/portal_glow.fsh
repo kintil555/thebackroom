@@ -6,7 +6,7 @@
 //
 // Satu baris = satu sumber (maksimal 4), 8 bit per kanal:
 //   texel 0: r,g = x (16 bit hi,lo)   b,a = y (16 bit hi,lo)   posisi layar ternormalisasi, asal kiri-atas
-//   texel 1: r,g = radius (16 bit)    b,a = intensitas (16 bit)
+//   texel 1: r,g = radius/2 (16 bit, fraksi tinggi layar, maks 2.0)    b,a = intensitas (16 bit)
 //   texel 2: r,g,b = warna tint
 // x,y disimpan sebagai (nilai + 0.5) / 2 agar pusat yang sedikit di luar layar tetap terwakili.
 //
@@ -28,7 +28,7 @@ out vec4 fragColor;
 
 const int MAX_SOURCES = 4;
 // Penguat sebelum kurva saturasi: inti glow melewati 1.0 sehingga memutih seperti bloom sungguhan.
-const float GAIN = 3.0;
+const float GAIN = 4.5;
 // Glow sedikit memanjang ke atas-bawah, mengikuti bentuk portal 3x5.
 const float VERTICAL_STRETCH = 1.35;
 // Efek kamera. Ubah angka ini untuk menyetel kekuatannya.
@@ -88,7 +88,7 @@ void main() {
         vec4 posData = texelFetch(DataSampler, ivec2(0, i), 0);
         vec4 sizeData = texelFetch(DataSampler, ivec2(1, i), 0);
         float intensity = decode16(sizeData.ba);
-        float radius = decode16(sizeData.rg) * OutSize.y;
+        float radius = decode16(sizeData.rg) * 2.0 * OutSize.y;
         if (intensity <= 0.001 || radius <= 1.0) {
             continue;
         }

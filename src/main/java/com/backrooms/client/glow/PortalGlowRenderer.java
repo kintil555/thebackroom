@@ -54,20 +54,18 @@ public final class PortalGlowRenderer {
 	// --- Tampilan: ubah di sini untuk menyetel glow ---
 	// Fase isi energi: glow muncul perlahan, makin lebar dan makin terang sampai portal terbuka.
 	private static final float START_RADIUS_BLOCKS = 0.5f;
-	private static final float PEAK_RADIUS_BLOCKS = 7.0f;
+	private static final float PEAK_RADIUS_BLOCKS = 18.0f;
 	private static final float START_INTENSITY = 0.04f;
 	private static final float PEAK_INTENSITY = 1.0f;
-	/** Eksponen kurva naik (>1 = awal pelan, akhir cepat). */
-	private static final float RISE_CURVE = 1.6f;
+	/** Eksponen kurva naik: 4 = awal sangat pelan, lalu melonjak kuat di ujung (tetap mulus, bukan instan). */
+	private static final float RISE_CURVE = 4.0f;
 	// Fase setelah portal terbuka: radius mengecil dan intensitas turun perlahan.
-	private static final float END_RADIUS_BLOCKS = 1.2f;
+	private static final float END_RADIUS_BLOCKS = 2.0f;
 	private static final float GLOW_DECAY_TICKS = 160.0f;
 	private static final float FADE_IN_TICKS = 8.0f;
 	// Efek kamera (distorsi + blur) di dekat portal.
 	private static final float WARP_RANGE_BLOCKS = 7.0f;
-	/** Kekuatan penuh selama ini setelah portal menyala, lalu memudar sampai AFTER_OPEN_TICKS habis. */
-	private static final float WARP_HOLD_TICKS = 40.0f;
-	/** Warna tint glow (putih hangat kekuningan). */
+		/** Warna tint glow (putih hangat kekuningan). */
 	private static final int TINT_R = 255;
 	private static final int TINT_G = 236;
 	private static final int TINT_B = 170;
@@ -152,7 +150,7 @@ public final class PortalGlowRenderer {
 
 		double elapsedTicks = nowTicks - source.startTick;
 		float progress = Mth.clamp((float) (elapsedTicks / source.durationTicks), 0.0f, 1.0f);
-		float rise = (float) Math.pow(PortalGlowFlicker.smooth(1.0f, progress), RISE_CURVE);
+		float rise = PortalGlowFlicker.smooth(1.0f, (float) Math.pow(progress, RISE_CURVE));
 		float radiusBlocks = Mth.lerp(rise, START_RADIUS_BLOCKS, PEAK_RADIUS_BLOCKS);
 		float envelope = Mth.lerp(rise, START_INTENSITY, PEAK_INTENSITY);
 		float flicker = PortalGlowFlicker.value(nowTicks / 20.0, source.seed);
@@ -172,17 +170,24 @@ public final class PortalGlowRenderer {
 		float near = Mth.clamp((float) Math.sqrt(distanceSq) / NEAR_DISTANCE_BLOCKS, MIN_NEAR_FACTOR, 1.0f);
 		float intensity = envelope * flicker * fadeIn * near * source.visibility;
 
-		return new Glow(projected[0] / width, projected[1] / height, Math.min(1.0f, projected[2] / height), intensity);
+		return new Glow(projected[0] / width, projected[1] / height, Math.min(2.0f, projected[2] / height), intensity);
 	}
 
-	/** Kekuatan distorsi+blur 0..1: hanya setelah portal terbuka, penuh sebentar lalu memudar, dan makin kuat saat player mendekat. */
+	/**
+	 * Kekuatan distorsi+blur 0..1. Naik bertahap sejak glow mulai (mengikuti progres pengisian), penuh sampai glow
+	 * selesai meredup, lalu memudar bertahap selama sisa {@link PortalGlowManager#AFTER_OPEN_TICKS} (ekor 5 detik).
+	 * Makin kuat saat player mendekat.
+	 */
 	private static float warpAmount(PortalGlowManager.Source source, Camera camera, double nowTicks) {
+		float time;
 		if (source.openedTick < 0L) {
-			return 0.0f;
+			float progress = Mth.clamp((float) ((nowTicks - source.startTick) / source.durationTicks), 0.0f, 1.0f);
+			time = PortalGlowFlicker.smooth(1.0f, progress);
+		} else {
+			float since = (float) Math.max(0.0, nowTicks - source.openedTick);
+			float tail = PortalGlowManager.AFTER_OPEN_TICKS - GLOW_DECAY_TICKS;
+			time = since <= GLOW_DECAY_TICKS ? 1.0f : 1.0f - PortalGlowFlicker.smooth(tail, since - GLOW_DECAY_TICKS);
 		}
-		float since = (float) (nowTicks - source.openedTick);
-		float fadeTicks = PortalGlowManager.AFTER_OPEN_TICKS - WARP_HOLD_TICKS;
-		float time = since <= WARP_HOLD_TICKS ? 1.0f : 1.0f - PortalGlowFlicker.smooth(fadeTicks, since - WARP_HOLD_TICKS);
 		float distance = (float) camera.position().distanceTo(Vec3.atCenterOf(source.center));
 		float near = Mth.clamp(1.0f - distance / WARP_RANGE_BLOCKS, 0.0f, 1.0f);
 		return time * near * near * (3.0f - 2.0f * near);
@@ -220,7 +225,7 @@ public final class PortalGlowRenderer {
 			Glow glow = glows.get(row);
 			int x = encode16((glow.x() + 0.5f) / 2.0f);
 			int y = encode16((glow.y() + 0.5f) / 2.0f);
-			int radius = encode16(glow.radius());
+			int radius = encode16(glow.radius() / 2.0f);
 			int intensity = encode16(glow.intensity());
 			image.setPixelABGR(0, row, abgr(x >> 8, x & 0xFF, y >> 8, y & 0xFF));
 			image.setPixelABGR(1, row, abgr(radius >> 8, radius & 0xFF, intensity >> 8, intensity & 0xFF));

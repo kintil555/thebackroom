@@ -19,8 +19,8 @@ import org.jspecify.annotations.Nullable;
 public final class PortalGlowManager {
 	/** Cek bingkai masih utuh tiap sekian tick (MagnetFrame.find memindai puluhan posisi). */
 	private static final int VALIDATE_INTERVAL_TICKS = 10;
-	/** Sumber dipertahankan sebanyak ini setelah portal terbuka agar glow bisa meredup dan efek kamera memudar. */
-	public static final int AFTER_OPEN_TICKS = 200;
+	/** Sumber dipertahankan sebanyak ini setelah portal terbuka agar glow bisa meredup dan efek kamera memudar (glow 160 tick + ekor efek kamera 100 tick). */
+	public static final int AFTER_OPEN_TICKS = 260;
 	/** Toleransi menunggu paket blok portal tiba setelah durasi pengisian habis. */
 	private static final int OPEN_GRACE_TICKS = 40;
 
