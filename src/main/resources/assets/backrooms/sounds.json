@@ -30,7 +30,7 @@
       {
         "name": "backrooms:siren_alarm",
         "volume": 1.0,
-        "attenuation_distance": 64
+        "attenuation_distance": 96
       }
     ]
   },

@@ -1,15 +1,18 @@
 package com.backrooms.block;
 
-import com.backrooms.ModSounds;
+import com.backrooms.ModBlockEntities;
+import com.backrooms.client.SirenAlarmSound;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.sounds.SoundSource;
-import net.minecraft.util.RandomSource;
 import net.minecraft.world.item.context.BlockPlaceContext;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.EntityBlock;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.BlockEntityTicker;
+import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
@@ -19,7 +22,7 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * Siren Alert: saat aktif (diatur Magnet) outline model tampil, lampu berputar (SirenRenderer), dan alarm
- * diulang tiap {@link #LOOP_TICKS}. Saat mati outline disembunyikan (model siren_off).
+ * diputar loop di client (SirenAlarmSound). Saat mati outline disembunyikan (model siren_off).
  */
 public class SirenBlock extends Block implements EntityBlock {
 	public static final BooleanProperty ACTIVE = BooleanProperty.create("active");
@@ -28,11 +31,6 @@ public class SirenBlock extends Block implements EntityBlock {
 
 	/** Jangkauan (blok) sirine yang ikut dibunyikan oleh sebuah Magnet. */
 	public static final int RANGE = 16;
-	/** Durasi file alarm ~2,48 detik; diulang tiap 50 tick (2,5 detik). */
-	private static final int LOOP_TICKS = 50;
-	/** Volume > 1 memperluas jangkauan dengar (3.0 = 48 blok). */
-	private static final float VOLUME = 3.0F;
-
 	public SirenBlock(Properties properties) {
 		super(properties);
 		registerDefaultState(defaultBlockState().setValue(ACTIVE, false).setValue(FACING, Direction.UP));
@@ -54,13 +52,17 @@ public class SirenBlock extends Block implements EntityBlock {
 		return new SirenBlockEntity(pos, state);
 	}
 
+	/** Alarm dimainkan di client (SirenAlarmSound) agar bisa fade in/out dan pitch naik; server tidak lagi memutar suara. */
 	@Override
-	protected void tick(BlockState state, ServerLevel level, BlockPos pos, RandomSource random) {
-		if (!state.getValue(ACTIVE)) {
-			return;
+	public <T extends BlockEntity> @Nullable BlockEntityTicker<T> getTicker(Level level, BlockState state, BlockEntityType<T> type) {
+		if (!level.isClientSide() || type != ModBlockEntities.SIREN) {
+			return null;
 		}
-		level.playSound(null, pos, ModSounds.SIREN_ALARM, SoundSource.BLOCKS, VOLUME, 1.0F);
-		level.scheduleTick(pos, this, LOOP_TICKS);
+		return (tickLevel, tickPos, tickState, entity) -> {
+			if (tickLevel instanceof ClientLevel clientLevel) {
+				SirenAlarmSound.tickBlock(clientLevel, tickPos, tickState);
+			}
+		};
 	}
 
 	/** Menyalakan/mematikan semua Siren Alert dalam {@link #RANGE} blok dari origin. */
@@ -72,12 +74,9 @@ public class SirenBlock extends Block implements EntityBlock {
 				continue;
 			}
 			BlockState state = level.getBlockState(pos);
-			if (state.getBlock() instanceof SirenBlock siren && state.getValue(ACTIVE) != active) {
+			if (state.getBlock() instanceof SirenBlock && state.getValue(ACTIVE) != active) {
 				BlockPos target = pos.immutable();
 				level.setBlock(target, state.setValue(ACTIVE, active), Block.UPDATE_ALL);
-				if (active) {
-					level.scheduleTick(target, siren, 1);
-				}
 			}
 		}
 	}
