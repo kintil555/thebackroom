@@ -3,6 +3,8 @@ package com.backrooms.block;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.item.context.BlockPlaceContext;
@@ -78,6 +80,7 @@ public class MagnetBlock extends Block {
 		}
 		MagnetFrame frame = MagnetFrame.find(serverLevel, pos, true);
 		if (frame == null || !frame.isPowered(serverLevel)) {
+			reportDebug(serverLevel, pos, frame);
 			return;
 		}
 		// Semua Magnet bingkai ditandai ACTIVE. Magnet pertama (pemimpin) menyalakan sirine setelah SIREN_DELAY_TICKS,
@@ -87,6 +90,21 @@ public class MagnetBlock extends Block {
 			serverLevel.setBlock(magnetPos, magnetState.setValue(ACTIVE, true).setValue(WARNING, false), Block.UPDATE_ALL);
 			boolean leader = magnetPos.equals(frame.magnets().get(0));
 			serverLevel.scheduleTick(magnetPos, this, leader ? SIREN_DELAY_TICKS : WARNING_TICKS);
+		}
+	}
+
+	/** Diagnosa sementara (hapus setelah portal beres): beri tahu pemain di dekat Magnet yang menerima power tetapi tidak membuka. */
+	private static void reportDebug(ServerLevel level, BlockPos pos, @Nullable MagnetFrame frame) {
+		int power = level.getBestNeighborSignal(pos);
+		if (power <= 0) {
+			return;
+		}
+		String reason = frame == null ? MagnetFrame.explain(level, pos) : "bingkai OK, tapi power kurang dari " + REQUIRED_POWER;
+		Component message = Component.literal("[Magnet " + pos.toShortString() + "] power=" + power + "/" + REQUIRED_POWER + " | " + reason);
+		for (ServerPlayer player : level.players()) {
+			if (player.blockPosition().distSqr(pos) < 24 * 24) {
+				player.sendSystemMessage(message);
+			}
 		}
 	}
 

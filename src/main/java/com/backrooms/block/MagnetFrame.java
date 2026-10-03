@@ -85,6 +85,60 @@ public record MagnetFrame(BlockPos base, Direction right, List<BlockPos> magnets
 		return new MagnetFrame(base, right, List.copyOf(magnets));
 	}
 
+	/**
+	 * Diagnosa sementara: kandidat bingkai dengan masalah paling sedikit di sekitar {@code pos}, beserta alasannya
+	 * (maksimal 4). Kosong jika tidak ada Magnet lain di sekitar.
+	 */
+	public static String explain(Level level, BlockPos pos) {
+		List<String> best = null;
+		for (Direction right : new Direction[] {Direction.EAST, Direction.SOUTH}) {
+			for (int[] offset : MAGNET_OFFSETS) {
+				BlockPos base = pos.relative(right.getOpposite(), offset[0]).below(offset[1]);
+				List<String> problems = problems(level, base, right);
+				if (best == null || problems.size() < best.size()) {
+					best = problems;
+				}
+			}
+		}
+		if (best == null || best.isEmpty()) {
+			return "bingkai OK";
+		}
+		return best.size() + " masalah: " + String.join("; ", best.subList(0, Math.min(4, best.size())));
+	}
+
+	private static List<String> problems(Level level, BlockPos base, Direction right) {
+		List<String> problems = new ArrayList<>();
+		for (int a = 0; a < WIDTH; a++) {
+			BlockPos floorPos = at(base, right, a, -1);
+			BlockState floor = stateAt(level, floorPos);
+			if (floor.isAir() || floor.canBeReplaced()) {
+				problems.add("lantai kosong " + floorPos.toShortString());
+			}
+			for (int h = 0; h < HEIGHT; h++) {
+				BlockPos insidePos = at(base, right, a, h);
+				BlockState inside = stateAt(level, insidePos);
+				if (!inside.isAir() && !inside.canBeReplaced()) {
+					problems.add("ruang portal terisi " + insidePos.toShortString() + " (" + inside.getBlock().getName().getString() + ")");
+				}
+			}
+		}
+		for (int[] offset : MAGNET_OFFSETS) {
+			int a = offset[0];
+			BlockPos magnetPos = at(base, right, a, offset[1]);
+			BlockState state = stateAt(level, magnetPos);
+			if (!(state.getBlock() instanceof MagnetBlock)) {
+				problems.add("bukan Magnet " + magnetPos.toShortString());
+				continue;
+			}
+			Direction facing = state.getValue(MagnetBlock.FACING);
+			Direction expected = offset[1] == HEIGHT ? Direction.DOWN : a == -1 ? right : right.getOpposite();
+			if (facing != expected) {
+				problems.add("Magnet " + magnetPos.toShortString() + " menghadap " + facing + ", harus " + expected);
+			}
+		}
+		return problems;
+	}
+
 	private static BlockPos at(BlockPos base, Direction right, int a, int h) {
 		return base.relative(right, a).above(h);
 	}
