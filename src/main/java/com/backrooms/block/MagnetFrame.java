@@ -18,8 +18,8 @@ import org.jspecify.annotations.Nullable;
  * koordinat (a, h): a = geser sepanjang {@link #right}, h = naik dari {@link #base}.
  * - Magnet: kolom kiri (a=-1) dan kanan (a=WIDTH) setinggi portal, plus baris atas (h=HEIGHT). Sudut tidak perlu.
  * - Bawah (h=-1): blok apa saja asal bukan udara/replaceable.
- * - Sisi magnet yang menjorok (FACING) di kolom kiri/kanan harus menghadap ke dalam, jadi pemain berdiri di tengah
- *   saat memasangnya. Baris atas bebas menghadap ke mana saja.
+ * - Sisi magnet yang menjorok (FACING) di kolom kiri/kanan harus menghadap ke dalam (horizontal ke tengah), dan
+ *   baris atas harus menghadap ke bawah ({@link Direction#DOWN}).
  */
 public record MagnetFrame(BlockPos base, Direction right, List<BlockPos> magnets) {
 	public static final int WIDTH = 3;
@@ -76,7 +76,8 @@ public record MagnetFrame(BlockPos base, Direction right, List<BlockPos> magnets
 				return null;
 			}
 			Direction facing = state.getValue(MagnetBlock.FACING);
-			if (a == -1 && facing != right || a == WIDTH && facing != right.getOpposite()) {
+			boolean topRow = offset[1] == HEIGHT;
+			if (topRow ? facing != Direction.DOWN : a == -1 && facing != right || a == WIDTH && facing != right.getOpposite()) {
 				return null;
 			}
 			magnets.add(magnetPos);

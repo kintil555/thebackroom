@@ -2,6 +2,7 @@ package com.backrooms.block;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.item.context.BlockPlaceContext;
@@ -18,48 +19,75 @@ import org.jspecify.annotations.Nullable;
 /**
  * Magnet: bagian bingkai portal ({@link MagnetFrame}). Jika bingkai lengkap dan salah satu Magnet dialiri
  * redstone power 15, sirine di sekitar berbunyi {@link #WARNING_TICKS}, lalu portal 3x5 terbuka di dalam bingkai.
- * Sisi menjorok Magnet (FACING) menghadap pemain saat dipasang, seperti End Portal Frame.
+ * Sisi menjorok Magnet (FACING) menghadap ke dalam bingkai: kolom kiri/kanan menghadap horizontal ke tengah,
+ * baris atas menghadap {@link Direction#DOWN}.
  */
 public class MagnetBlock extends Block {
-	public static final EnumProperty<Direction> FACING = BlockStateProperties.HORIZONTAL_FACING;
+	public static final EnumProperty<Direction> FACING = BlockStateProperties.FACING;
 	/** True selama hitung mundur sebelum portal terbuka (dipasang di semua Magnet pada bingkai). */
 	public static final BooleanProperty ACTIVE = BooleanProperty.create("active");
 
-	public static final int REQUIRED_POWER = 15;
-	/** Lama peringatan sebelum portal terbuka: 5 detik. */
-	public static final int WARNING_TICKS = 100;
+	/** Power minimum redstone untuk memicu portal. */
+	public static final int REQUIRED_POWER = 12;
+	/** True pada Magnet pemimpin (kiri-bawah) setelah sirine dinyalakan. */
+	public static final BooleanProperty WARNING = BooleanProperty.create("warning");
+	/** Lama pengumpulan energi sebelum portal terbuka: 10 detik. */
+	public static final int WARNING_TICKS = 200;
+	/** Sirine mulai berbunyi 4 detik setelah power menyala. */
+	public static final int SIREN_DELAY_TICKS = 80;
 
 	public MagnetBlock(Properties properties) {
 		super(properties);
-		registerDefaultState(defaultBlockState().setValue(FACING, Direction.NORTH).setValue(ACTIVE, false));
+		registerDefaultState(defaultBlockState().setValue(FACING, Direction.NORTH).setValue(ACTIVE, false).setValue(WARNING, false));
 	}
 
 	@Override
 	protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
-		builder.add(FACING, ACTIVE);
+		builder.add(FACING, ACTIVE, WARNING);
 	}
 
 	@Override
 	public @Nullable BlockState getStateForPlacement(BlockPlaceContext context) {
-		return defaultBlockState().setValue(FACING, context.getHorizontalDirection().getOpposite());
+		Direction clickedFace = context.getClickedFace();
+		boolean topRow = clickedFace == Direction.DOWN;
+		if (!topRow && clickedFace.getAxis().isHorizontal()) {
+			// Disambung ke samping Magnet baris atas (menghadap bawah): ikut menghadap bawah.
+			BlockState clicked = context.getLevel().getBlockState(context.getClickedPos().relative(clickedFace.getOpposite()));
+			topRow = clicked.getBlock() instanceof MagnetBlock && clicked.getValue(FACING) == Direction.DOWN;
+		}
+		Direction facing = topRow ? Direction.DOWN : context.getHorizontalDirection().getOpposite();
+		return defaultBlockState().setValue(FACING, facing);
+	}
+
+	@Override
+	protected void onPlace(BlockState state, Level level, BlockPos pos, BlockState oldState, boolean movedByPiston) {
+		if (!state.is(oldState.getBlock())) {
+			tryActivate(level, pos, state);
+		}
 	}
 
 	@Override
 	protected void neighborChanged(BlockState state, Level level, BlockPos pos, Block block, @Nullable Orientation orientation, boolean movedByPiston) {
-		if (!(level instanceof ServerLevel serverLevel) || state.getValue(ACTIVE) || level.getBestNeighborSignal(pos) < REQUIRED_POWER) {
+		tryActivate(level, pos, state);
+	}
+
+	/** Mulai hitung mundur jika bingkai lengkap dan salah satu Magnet bertenaga (juga saat Magnet terakhir baru dipasang). */
+	private void tryActivate(Level level, BlockPos pos, BlockState state) {
+		if (!(level instanceof ServerLevel serverLevel) || state.getValue(ACTIVE)) {
 			return;
 		}
 		MagnetFrame frame = MagnetFrame.find(serverLevel, pos, true);
-		if (frame == null) {
+		if (frame == null || !frame.isPowered(serverLevel)) {
 			return;
 		}
-		// Semua Magnet bingkai ditandai ACTIVE dan masing-masing menjadwalkan tick selesai (tahan jika salah satu rusak).
+		// Semua Magnet bingkai ditandai ACTIVE. Magnet pertama (pemimpin) menyalakan sirine setelah SIREN_DELAY_TICKS,
+		// lalu menyelesaikan sisa hitung mundur; Magnet lain langsung dijadwalkan selesai (tahan jika salah satu rusak).
 		for (BlockPos magnetPos : frame.magnets()) {
 			BlockState magnetState = serverLevel.getBlockState(magnetPos);
-			serverLevel.setBlock(magnetPos, magnetState.setValue(ACTIVE, true), Block.UPDATE_ALL);
-			serverLevel.scheduleTick(magnetPos, this, WARNING_TICKS);
+			serverLevel.setBlock(magnetPos, magnetState.setValue(ACTIVE, true).setValue(WARNING, false), Block.UPDATE_ALL);
+			boolean leader = magnetPos.equals(frame.magnets().get(0));
+			serverLevel.scheduleTick(magnetPos, this, leader ? SIREN_DELAY_TICKS : WARNING_TICKS);
 		}
-		SirenBlock.setNearby(serverLevel, frame.center(), true);
 	}
 
 	@Override
@@ -67,12 +95,32 @@ public class MagnetBlock extends Block {
 		if (!state.getValue(ACTIVE)) {
 			return;
 		}
-		level.setBlock(pos, state.setValue(ACTIVE, false), Block.UPDATE_ALL);
 		MagnetFrame frame = MagnetFrame.find(level, pos, false);
+		if (frame != null && !state.getValue(WARNING) && pos.equals(frame.magnets().get(0))) {
+			// Tahap 1 (pemimpin): sirine mulai berbunyi, lalu jadwalkan penyelesaian.
+			level.setBlock(pos, state.setValue(WARNING, true), Block.UPDATE_ALL);
+			SirenBlock.setNearby(level, frame.center(), true);
+			level.scheduleTick(pos, this, WARNING_TICKS - SIREN_DELAY_TICKS);
+			return;
+		}
+		level.setBlock(pos, state.setValue(ACTIVE, false).setValue(WARNING, false), Block.UPDATE_ALL);
 		SirenBlock.setNearby(level, frame != null ? frame.center() : pos, false);
-		// Bingkai masih utuh dan daya masih ada: buka. Tick Magnet lain menemukan ruang sudah terisi, jadi tidak ganda.
-		if (frame != null && frame.isPowered(level)) {
+		// Bingkai masih utuh: buka (daya boleh hanya pulsa). Tick Magnet lain menemukan ruang sudah terisi, jadi tidak ganda.
+		if (frame != null) {
 			frame.openPortal(level);
+		}
+	}
+
+	/** Efek mengumpulkan energi: partikel portal di sekitar Magnet selama hitung mundur. */
+	@Override
+	public void animateTick(BlockState state, Level level, BlockPos pos, RandomSource random) {
+		if (!state.getValue(ACTIVE)) {
+			return;
+		}
+		for (int i = 0; i < 2; i++) {
+			level.addParticle(ParticleTypes.PORTAL,
+				pos.getX() + random.nextDouble(), pos.getY() + random.nextDouble(), pos.getZ() + random.nextDouble(),
+				(random.nextDouble() - 0.5) * 0.5, (random.nextDouble() - 0.5) * 0.5, (random.nextDouble() - 0.5) * 0.5);
 		}
 	}
 }

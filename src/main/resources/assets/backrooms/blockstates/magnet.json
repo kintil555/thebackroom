@@ -1,19 +1,10 @@
 {
   "variants": {
-    "facing=north": {
-      "model": "backrooms:block/magnet"
-    },
-    "facing=east": {
-      "model": "backrooms:block/magnet",
-      "y": 90
-    },
-    "facing=south": {
-      "model": "backrooms:block/magnet",
-      "y": 180
-    },
-    "facing=west": {
-      "model": "backrooms:block/magnet",
-      "y": 270
-    }
+    "facing=north": { "model": "backrooms:block/magnet" },
+    "facing=east": { "model": "backrooms:block/magnet", "y": 90 },
+    "facing=south": { "model": "backrooms:block/magnet", "y": 180 },
+    "facing=west": { "model": "backrooms:block/magnet", "y": 270 },
+    "facing=down": { "model": "backrooms:block/magnet", "x": 90 },
+    "facing=up": { "model": "backrooms:block/magnet", "x": 270 }
   }
 }
