@@ -10,6 +10,7 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.Vec3;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -39,6 +40,8 @@ public final class PortalGlowManager {
 		final float seed;
 		/** Tick game saat client melihat portal terbuka; -1 selama masih mengisi energi. */
 		long openedTick = -1L;
+		/** Urutan suara pengisian energi di posisi portal ini. */
+		final PortalChargeSounds sounds;
 		/** Keterlihatan hasil smoothing 0..1: turun saat tengah portal terhalang blok dari kamera. */
 		float visibility;
 
@@ -48,6 +51,7 @@ public final class PortalGlowManager {
 			this.startTick = startTick;
 			this.durationTicks = durationTicks;
 			this.seed = (center.hashCode() & 0xFFFF) / 65535.0f * (float) (Math.PI * 2.0);
+			this.sounds = new PortalChargeSounds(Vec3.atCenterOf(center));
 		}
 	}
 
@@ -65,12 +69,19 @@ public final class PortalGlowManager {
 		if (level == null) {
 			return;
 		}
-		SOURCES.removeIf(source -> source.center.equals(payload.center()));
+		SOURCES.removeIf(source -> {
+			if (source.center.equals(payload.center())) {
+				source.sounds.stop();
+				return true;
+			}
+			return false;
+		});
 		SOURCES.add(new Source(payload.leader(), payload.center(), level.getGameTime(), payload.durationTicks()));
 	}
 
 	private static void tick(@Nullable ClientLevel level) {
 		if (level == null) {
+			SOURCES.forEach(source -> source.sounds.stop());
 			SOURCES.clear();
 			return;
 		}
@@ -78,6 +89,7 @@ public final class PortalGlowManager {
 		Iterator<Source> iterator = SOURCES.iterator();
 		while (iterator.hasNext()) {
 			Source source = iterator.next();
+			source.sounds.tick(now - source.startTick);
 			if (source.openedTick < 0L && level.getBlockState(source.center).is(ModBlocks.PLACEHOLDER_PORTAL)) {
 				source.openedTick = now;
 			}
@@ -88,6 +100,9 @@ public final class PortalGlowManager {
 			boolean broken = charging && (now - source.startTick) % VALIDATE_INTERVAL_TICKS == 0
 				&& MagnetFrame.find(level, source.leader, false) == null;
 			if (finished || neverOpened || broken) {
+				if (broken) {
+					source.sounds.stop();
+				}
 				iterator.remove();
 			}
 		}

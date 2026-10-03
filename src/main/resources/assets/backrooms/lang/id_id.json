@@ -13,5 +13,9 @@
   "block.backrooms.magnet": "Magnet",
   "block.backrooms.siren": "Sirene Peringatan",
   "subtitles.backrooms.siren_alarm": "Sirene meraung",
+  "subtitles.backrooms.portal_rising": "Energi menguat",
+  "subtitles.backrooms.portal_loop": "Energi berdengung",
+  "subtitles.backrooms.portal_burst_energy": "Energi meledak",
+  "subtitles.backrooms.portal_after_spawn": "Portal terbuka",
   "block.backrooms.placeholder_portal": "Portal Sementara"
 }

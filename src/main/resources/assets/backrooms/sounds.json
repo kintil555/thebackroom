@@ -33,5 +33,45 @@
         "attenuation_distance": 64
       }
     ]
+  },
+  "portal_rising": {
+    "subtitle": "subtitles.backrooms.portal_rising",
+    "sounds": [
+      {
+        "name": "backrooms:portal_rising",
+        "volume": 1.0,
+        "attenuation_distance": 64
+      }
+    ]
+  },
+  "portal_loop": {
+    "subtitle": "subtitles.backrooms.portal_loop",
+    "sounds": [
+      {
+        "name": "backrooms:portal_loop",
+        "volume": 1.0,
+        "attenuation_distance": 64
+      }
+    ]
+  },
+  "portal_burst_energy": {
+    "subtitle": "subtitles.backrooms.portal_burst_energy",
+    "sounds": [
+      {
+        "name": "backrooms:portal_burst_energy",
+        "volume": 1.0,
+        "attenuation_distance": 128
+      }
+    ]
+  },
+  "portal_after_spawn": {
+    "subtitle": "subtitles.backrooms.portal_after_spawn",
+    "sounds": [
+      {
+        "name": "backrooms:portal_after_spawn",
+        "volume": 1.0,
+        "attenuation_distance": 80
+      }
+    ]
   }
 }
