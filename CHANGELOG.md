@@ -7,6 +7,7 @@
 - Blok baru: Lamp (versi menyala/mati, light level 15 seperti Ochre Froglight). Random tick: peluang 67% berkedip mati-nyala beberapa kali lalu kembali normal
 - Fix Lamp: tekstur 64x64 berformat cube net (top/bottom/east/north/west/south), model kini memakai UV per sisi, bukan cube_all
 - Lamp: suara kedip (neon sputter, mono ogg + echo, 3 variasi pitch) di awal sesi kedip; maksimal 10 suara aktif dalam radius 16 blok
+- Lamp: efek domino. Sesi kedip menyebar ke lampu menyala dalam radius 8 blok (peluang turun menurut jarak; sebagian bersamaan, sisanya tertunda seperti gelombang), cooldown 5 detik agar tidak berantai tanpa batas
 - Wallpaper dan Carpet jadi item. Keduanya menempel di face blok, bukan blok terpisah di luarnya
 - Screw Piles: lapisan disimpan di blockstate (6 property per sisi)
 - Carpet di blok lain: disimpan sebagai attachment chunk (tersimpan + tersinkron), digambar di mesh chunk lewat mixin
