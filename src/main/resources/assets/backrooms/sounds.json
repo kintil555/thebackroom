@@ -6,5 +6,11 @@
       { "name": "backrooms:lamp_flicker", "pitch": 1.0 },
       { "name": "backrooms:lamp_flicker", "pitch": 1.1 }
     ]
+  },
+  "untitled": {
+    "subtitle": "subtitles.backrooms.untitled",
+    "sounds": [
+      { "name": "backrooms:untitled" }
+    ]
   }
 }

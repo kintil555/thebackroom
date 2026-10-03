@@ -1,6 +1,7 @@
 package com.backrooms.block;
 
 import com.backrooms.ModSounds;
+import com.backrooms.blackout.LampBlackout;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -77,6 +78,9 @@ public class LampBlock extends Block {
 
 	@Override
 	protected void randomTick(BlockState state, ServerLevel level, BlockPos pos, RandomSource random) {
+		if (LampBlackout.isBlackedOut(level, pos)) {
+			return; // sedang dipadamkan event blackout (mood 100%)
+		}
 		if (!state.getValue(LIT)) {
 			level.setBlock(pos, state.setValue(LIT, true), Block.UPDATE_CLIENTS);
 			return;
@@ -92,6 +96,9 @@ public class LampBlock extends Block {
 
 	@Override
 	protected void tick(BlockState state, ServerLevel level, BlockPos pos, RandomSource random) {
+		if (LampBlackout.isBlackedOut(level, pos)) {
+			return; // sedang dipadamkan event blackout (mood 100%)
+		}
 		boolean lit = state.getValue(LIT);
 		level.setBlock(pos, state.setValue(LIT, !lit), Block.UPDATE_CLIENTS);
 		if (lit) {

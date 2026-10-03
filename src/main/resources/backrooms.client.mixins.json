@@ -7,7 +7,8 @@
     "DebugLookingAtTagsMixin",
     "ItemModelResolverMixin",
     "LevelRendererMixin",
-    "MultiPlayerGameModeMixin"
+    "MultiPlayerGameModeMixin",
+    "SimpleSoundInstanceMixin"
   ],
   "injectors": {
     "defaultRequire": 1
