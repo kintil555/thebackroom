@@ -57,8 +57,10 @@ public final class PortalGlowRenderer {
 	private static final float PEAK_RADIUS_BLOCKS = 18.0f;
 	private static final float START_INTENSITY = 0.04f;
 	private static final float PEAK_INTENSITY = 1.0f;
-	/** Eksponen kurva naik: 4 = awal sangat pelan, lalu melonjak kuat di ujung (tetap mulus, bukan instan). */
-	private static final float RISE_CURVE = 4.0f;
+	/** Bloom naik pelan sampai fraksi durasi ini (detik 9 dari 10), lalu melebar mendadak (tetap mulus, ada easing). */
+	private static final float BURST_START_FRACTION = 0.9f;
+	/** Tingkat bloom (0..1) yang sudah tercapai sesaat sebelum burst dimulai. */
+	private static final float PRE_BURST_LEVEL = 0.12f;
 	// Fase setelah portal terbuka: radius mengecil dan intensitas turun perlahan.
 	private static final float END_RADIUS_BLOCKS = 2.0f;
 	private static final float GLOW_DECAY_TICKS = 160.0f;
@@ -150,7 +152,7 @@ public final class PortalGlowRenderer {
 
 		double elapsedTicks = nowTicks - source.startTick;
 		float progress = Mth.clamp((float) (elapsedTicks / source.durationTicks), 0.0f, 1.0f);
-		float rise = PortalGlowFlicker.smooth(1.0f, (float) Math.pow(progress, RISE_CURVE));
+		float rise = riseLevel(progress);
 		float radiusBlocks = Mth.lerp(rise, START_RADIUS_BLOCKS, PEAK_RADIUS_BLOCKS);
 		float envelope = Mth.lerp(rise, START_INTENSITY, PEAK_INTENSITY);
 		float flicker = PortalGlowFlicker.value(nowTicks / 20.0, source.seed);
@@ -171,6 +173,16 @@ public final class PortalGlowRenderer {
 		float intensity = envelope * flicker * fadeIn * near * source.visibility;
 
 		return new Glow(projected[0] / width, projected[1] / height, Math.min(2.0f, projected[2] / height), intensity);
+	}
+
+	/**
+	 * Kurva bloom: naik halus dan pelan sampai {@link #PRE_BURST_LEVEL} pada {@link #BURST_START_FRACTION}, lalu melonjak
+	 * ke 1.0 di sisa durasi dengan easing smoothstep (tanpa patahan di awal maupun akhir).
+	 */
+	private static float riseLevel(float progress) {
+		float slow = PRE_BURST_LEVEL * PortalGlowFlicker.smooth(1.0f, Math.min(1.0f, progress / BURST_START_FRACTION));
+		float burst = PortalGlowFlicker.smooth(1.0f, (progress - BURST_START_FRACTION) / (1.0f - BURST_START_FRACTION));
+		return slow + (1.0f - slow) * burst;
 	}
 
 	/**

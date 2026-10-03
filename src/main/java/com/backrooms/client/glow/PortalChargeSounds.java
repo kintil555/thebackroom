@@ -19,7 +19,7 @@ import net.minecraft.world.phys.Vec3;
  * <ul>
  *   <li>{@code rising} mulai 2 detik setelah pengisian dimulai dan diputar sampai habis.</li>
  *   <li>{@code burst_energy} mulai {@link #BURST_AT_SECONDS} detik setelah pengisian dimulai, tepat saat bloom melebar
- *       mendadak (kurva RISE_CURVE di {@link PortalGlowRenderer}); dilapis beberapa pitch agar keras dan kasar.</li>
+ *       mendadak (kurva riseLevel di {@link PortalGlowRenderer}); dilapis beberapa pitch agar keras dan kasar.</li>
  *   <li>{@code loop}: 3 suara berbeda pitch, mulai bersama rising, berulang sampai burst habis, lalu fade out.</li>
  *   <li>{@code after_portal_spawn} diputar {@link #AFTER_DELAY_SECONDS} detik setelah portal terbuka (bukan saat terbuka).</li>
  * </ul>
@@ -28,8 +28,8 @@ final class PortalChargeSounds {
 	private static final int TICKS_PER_SECOND = 20;
 	private static final double RISING_SECONDS = 5.08;
 	private static final double BURST_SECONDS = 2.0;
-	/** Burst mulai di sini (detik sejak pengisian dimulai); selesai bersamaan dengan portal terbuka (10 detik). */
-	private static final double BURST_AT_SECONDS = 8.0;
+	/** Burst mulai di sini (detik sejak pengisian dimulai); portal terbuka di 10 detik, burst selesai 1 detik sesudahnya. */
+	private static final double BURST_AT_SECONDS = 9.0;
 	/** Jeda after_portal_spawn setelah portal terbuka. */
 	private static final double AFTER_DELAY_SECONDS = 2.0;
 
