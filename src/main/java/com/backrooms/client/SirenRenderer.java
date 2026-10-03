@@ -6,6 +6,7 @@ import com.backrooms.block.SirenBlockEntity;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.math.Axis;
+import net.minecraft.core.Direction;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
 import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
@@ -50,6 +51,7 @@ public class SirenRenderer implements BlockEntityRenderer<SirenBlockEntity, Sire
 	public static class State extends BlockEntityRenderState {
 		public boolean active;
 		public float angle;
+		public Direction facing = Direction.UP;
 	}
 
 	@Override
@@ -61,6 +63,7 @@ public class SirenRenderer implements BlockEntityRenderer<SirenBlockEntity, Sire
 	public void extractRenderState(SirenBlockEntity blockEntity, State state, float partialTicks, Vec3 cameraPosition, ModelFeatureRenderer.@Nullable CrumblingOverlay breakProgress) {
 		BlockEntityRenderer.super.extractRenderState(blockEntity, state, partialTicks, cameraPosition, breakProgress);
 		state.active = blockEntity.getBlockState().getValue(SirenBlock.ACTIVE);
+		state.facing = blockEntity.getBlockState().getValue(SirenBlock.FACING);
 		long time = blockEntity.getLevel() != null ? blockEntity.getLevel().getGameTime() : 0L;
 		state.angle = ((time % 24L) + partialTicks) * DEGREES_PER_TICK; // 24 tick = 360 derajat penuh
 	}
@@ -71,6 +74,10 @@ public class SirenRenderer implements BlockEntityRenderer<SirenBlockEntity, Sire
 			return;
 		}
 		poseStack.pushPose();
+		// Samakan orientasi dengan blockstate (x lalu y) sekitar pusat blok, lalu putar di sumbu lokal Y.
+		poseStack.translate(0.5F, 0.5F, 0.5F);
+		orient(poseStack, state.facing);
+		poseStack.translate(-0.5F, -0.5F, -0.5F);
 		poseStack.translate(PIVOT_X, 0.0F, PIVOT_Z);
 		poseStack.mulPose(Axis.YP.rotationDegrees(state.angle));
 		poseStack.translate(-PIVOT_X, 0.0F, -PIVOT_Z);
@@ -80,6 +87,28 @@ public class SirenRenderer implements BlockEntityRenderer<SirenBlockEntity, Sire
 			quad(pose, buffer, U_BACK_0, U_BACK_1, true);
 		});
 		poseStack.popPose();
+	}
+
+	/** Setara rotasi blockstate: x=90 = XP(-90), y=n = YP(-n); x diterapkan lebih dulu. */
+	private static void orient(PoseStack poseStack, Direction facing) {
+		switch (facing) {
+			case DOWN -> poseStack.mulPose(Axis.XP.rotationDegrees(180.0F));
+			case NORTH -> poseStack.mulPose(Axis.XP.rotationDegrees(-90.0F));
+			case EAST -> {
+				poseStack.mulPose(Axis.YP.rotationDegrees(-90.0F));
+				poseStack.mulPose(Axis.XP.rotationDegrees(-90.0F));
+			}
+			case SOUTH -> {
+				poseStack.mulPose(Axis.YP.rotationDegrees(-180.0F));
+				poseStack.mulPose(Axis.XP.rotationDegrees(-90.0F));
+			}
+			case WEST -> {
+				poseStack.mulPose(Axis.YP.rotationDegrees(-270.0F));
+				poseStack.mulPose(Axis.XP.rotationDegrees(-90.0F));
+			}
+			default -> {
+			}
+		}
 	}
 
 	private static void quad(PoseStack.Pose pose, VertexConsumer buffer, float u0, float u1, boolean reversed) {

@@ -1,10 +1,56 @@
 {
   "variants": {
-    "active=true": {
+    "active=true,facing=up": {
       "model": "backrooms:block/siren"
     },
-    "active=false": {
+    "active=true,facing=down": {
+      "model": "backrooms:block/siren",
+      "x": 180
+    },
+    "active=true,facing=north": {
+      "model": "backrooms:block/siren",
+      "x": 90
+    },
+    "active=true,facing=east": {
+      "model": "backrooms:block/siren",
+      "x": 90,
+      "y": 90
+    },
+    "active=true,facing=south": {
+      "model": "backrooms:block/siren",
+      "x": 90,
+      "y": 180
+    },
+    "active=true,facing=west": {
+      "model": "backrooms:block/siren",
+      "x": 90,
+      "y": 270
+    },
+    "active=false,facing=up": {
       "model": "backrooms:block/siren_off"
+    },
+    "active=false,facing=down": {
+      "model": "backrooms:block/siren_off",
+      "x": 180
+    },
+    "active=false,facing=north": {
+      "model": "backrooms:block/siren_off",
+      "x": 90
+    },
+    "active=false,facing=east": {
+      "model": "backrooms:block/siren_off",
+      "x": 90,
+      "y": 90
+    },
+    "active=false,facing=south": {
+      "model": "backrooms:block/siren_off",
+      "x": 90,
+      "y": 180
+    },
+    "active=false,facing=west": {
+      "model": "backrooms:block/siren_off",
+      "x": 90,
+      "y": 270
     }
   }
 }

@@ -2,15 +2,19 @@ package com.backrooms.block;
 
 import com.backrooms.ModSounds;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.RandomSource;
+import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.EntityBlock;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.BooleanProperty;
+import net.minecraft.world.level.block.state.properties.EnumProperty;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -19,6 +23,8 @@ import org.jspecify.annotations.Nullable;
  */
 public class SirenBlock extends Block implements EntityBlock {
 	public static final BooleanProperty ACTIVE = BooleanProperty.create("active");
+	/** Arah sirine menghadap (menjauh dari permukaan tempat dipasang): UP = di lantai, DOWN = di langit-langit, horizontal = di dinding. */
+	public static final EnumProperty<Direction> FACING = BlockStateProperties.FACING;
 
 	/** Jangkauan (blok) sirine yang ikut dibunyikan oleh sebuah Magnet. */
 	public static final int RANGE = 16;
@@ -29,12 +35,18 @@ public class SirenBlock extends Block implements EntityBlock {
 
 	public SirenBlock(Properties properties) {
 		super(properties);
-		registerDefaultState(defaultBlockState().setValue(ACTIVE, false));
+		registerDefaultState(defaultBlockState().setValue(ACTIVE, false).setValue(FACING, Direction.UP));
 	}
 
 	@Override
 	protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
-		builder.add(ACTIVE);
+		builder.add(ACTIVE, FACING);
+	}
+
+	@Override
+	public @Nullable BlockState getStateForPlacement(BlockPlaceContext context) {
+		// Sisi yang diklik = arah hadap: klik atas blok -> berdiri di lantai, klik bawah -> menggantung, klik samping -> di dinding.
+		return defaultBlockState().setValue(FACING, context.getClickedFace());
 	}
 
 	@Override
