@@ -4,6 +4,7 @@
 - Blok baru: Screw Piles, Wallpaper, Carpet
 
 ## Unreleased
+- Blok baru: Lamp (versi menyala/mati, light level 15 seperti Ochre Froglight). Random tick: peluang 67% berkedip mati-nyala beberapa kali lalu kembali normal
 - Wallpaper dan Carpet jadi item. Keduanya menempel di face blok, bukan blok terpisah di luarnya
 - Screw Piles: lapisan disimpan di blockstate (6 property per sisi)
 - Carpet di blok lain: disimpan sebagai attachment chunk (tersimpan + tersinkron), digambar di mesh chunk lewat mixin

@@ -1,6 +1,7 @@
 package com.backrooms;
 
 import com.backrooms.block.CoverDisplayBlock;
+import com.backrooms.block.LampBlock;
 import com.backrooms.block.ScrewPilesBlock;
 import com.backrooms.item.CarpetItem;
 import com.backrooms.item.WallpaperItem;
@@ -42,6 +43,18 @@ public final class ModBlocks {
 			.sound(SoundType.STONE)
 	);
 
+	/** Lamp: light level 15 saat menyala (sama dengan Ochre Froglight), kadang berkedip mati-nyala. */
+	public static final Block LAMP = registerWithItem(
+		"lamp",
+		LampBlock::new,
+		BlockBehaviour.Properties.of()
+			.mapColor(MapColor.SAND)
+			.strength(0.3F)
+			.sound(SoundType.GLASS)
+			.lightLevel(state -> state.getValue(LampBlock.LIT) ? 15 : 0)
+			.randomTicks()
+	);
+
 	/** Blok model-saja untuk menggambar lapisan di sisi blok mana pun (tanpa item, tidak ada di dunia). */
 	public static final CoverDisplayBlock COVER_DISPLAY = (CoverDisplayBlock) registerBlock(
 		"cover_display",
@@ -66,6 +79,7 @@ public final class ModBlocks {
 		CreativeModeTabEvents.modifyOutputEvent(buildingBlocks).register(output -> {
 			output.accept(SCREW_PILES);
 			output.accept(CEILING);
+			output.accept(LAMP);
 			output.accept(WALLPAPER);
 			output.accept(WALLPAPERS);
 			output.accept(CARPET);

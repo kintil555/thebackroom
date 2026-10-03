@@ -1,0 +1,10 @@
+{
+  "variants": {
+    "lit=true": {
+      "model": "backrooms:block/lamp"
+    },
+    "lit=false": {
+      "model": "backrooms:block/lamp_off"
+    }
+  }
+}
