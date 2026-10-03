@@ -1,0 +1,19 @@
+{
+  "variants": {
+    "facing=north": {
+      "model": "backrooms:block/magnet"
+    },
+    "facing=east": {
+      "model": "backrooms:block/magnet",
+      "y": 90
+    },
+    "facing=south": {
+      "model": "backrooms:block/magnet",
+      "y": 180
+    },
+    "facing=west": {
+      "model": "backrooms:block/magnet",
+      "y": 270
+    }
+  }
+}

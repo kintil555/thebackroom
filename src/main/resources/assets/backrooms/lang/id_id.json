@@ -9,5 +9,9 @@
   "backrooms.name.attached_wallpaper": "%s Attached Wallpaper",
   "backrooms.name.attached_carpet": "%s Attached Carpet",
   "backrooms.name.attached_wallpaper_carpet": "%s Attached Wallpaper & Carpet",
-  "subtitles.backrooms.untitled": "Lamp goes dark"
+  "subtitles.backrooms.untitled": "Lamp goes dark",
+  "block.backrooms.magnet": "Magnet",
+  "block.backrooms.siren": "Sirene Peringatan",
+  "subtitles.backrooms.siren_alarm": "Sirene meraung",
+  "block.backrooms.placeholder_portal": "Portal Sementara"
 }

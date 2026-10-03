@@ -10,5 +10,9 @@
   "backrooms.name.attached_carpet": "%s Attached Carpet",
   "backrooms.name.attached_wallpaper_carpet": "%s Attached Wallpaper & Carpet",
   "subtitles.backrooms.untitled": "Lamp goes dark",
-  "block.backrooms.covered_block": "Attached Block"
+  "block.backrooms.covered_block": "Attached Block",
+  "block.backrooms.magnet": "Magnet",
+  "block.backrooms.siren": "Siren Alert",
+  "subtitles.backrooms.siren_alarm": "Siren blares",
+  "block.backrooms.placeholder_portal": "Placeholder Portal"
 }

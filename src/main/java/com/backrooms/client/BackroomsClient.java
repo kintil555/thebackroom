@@ -1,15 +1,18 @@
 package com.backrooms.client;
 
+import com.backrooms.ModBlockEntities;
 import com.backrooms.ModBlocks;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.model.loading.v1.ModelLoadingPlugin;
 import net.fabricmc.fabric.api.client.model.loading.v1.ModelModifier;
+import net.minecraft.client.renderer.blockentity.BlockEntityRenderers;
 import net.minecraft.world.level.block.Block;
 
 public class BackroomsClient implements ClientModInitializer {
 	@Override
 	public void onInitializeClient() {
 		ClientCovers.init();
+		BlockEntityRenderers.register(ModBlockEntities.SIREN, SirenRenderer::new);
 
 		// Bungkus model semua blok biasa agar carpet (attachment chunk) ikut tergambar. Screw Piles menggambar
 		// lapisannya lewat blockstate sendiri; cover_display tidak boleh dibungkus (dipakai sebagai model lapisan).

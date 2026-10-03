@@ -1,0 +1,10 @@
+{
+  "variants": {
+    "active=true": {
+      "model": "backrooms:block/siren"
+    },
+    "active=false": {
+      "model": "backrooms:block/siren_off"
+    }
+  }
+}

@@ -3,6 +3,9 @@ package com.backrooms;
 import com.backrooms.block.CoverDisplayBlock;
 import com.backrooms.block.CoveredBlock;
 import com.backrooms.block.LampBlock;
+import com.backrooms.block.MagnetBlock;
+import com.backrooms.block.PlaceholderPortalBlock;
+import com.backrooms.block.SirenBlock;
 import com.backrooms.block.ScrewPilesBlock;
 import com.backrooms.item.CarpetItem;
 import com.backrooms.item.WallpaperItem;
@@ -21,6 +24,7 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.material.MapColor;
+import net.minecraft.world.level.material.PushReaction;
 
 public final class ModBlocks {
 	public static final Block SCREW_PILES = registerWithItem(
@@ -56,6 +60,45 @@ public final class ModBlocks {
 			.randomTicks()
 	);
 
+	/** Magnet: 13 Magnet membentuk bingkai portal 3x5 (kiri, kanan, atas; bawah blok apa saja). Power 15 membuka portal. */
+	public static final Block MAGNET = registerWithItem(
+		"magnet",
+		MagnetBlock::new,
+		BlockBehaviour.Properties.of()
+			.mapColor(MapColor.METAL)
+			.strength(3.0F, 6.0F)
+			.sound(SoundType.METAL)
+			.requiresCorrectToolForDrops()
+			.noOcclusion()
+	);
+
+	/** Siren Alert: berbunyi dan lampunya berputar saat Magnet menghitung mundur. */
+	public static final Block SIREN = registerWithItem(
+		"siren",
+		SirenBlock::new,
+		BlockBehaviour.Properties.of()
+			.mapColor(MapColor.METAL)
+			.strength(2.0F, 4.0F)
+			.sound(SoundType.METAL)
+			.requiresCorrectToolForDrops()
+			.noOcclusion()
+			.lightLevel(state -> state.getValue(SirenBlock.ACTIVE) ? 10 : 0)
+	);
+
+	/** Placeholder portal (perilaku Nether Portal) untuk testing Magnet; tanpa item. TODO: ganti ke portal Backrooms. */
+	public static final Block PLACEHOLDER_PORTAL = registerBlock(
+		"placeholder_portal",
+		PlaceholderPortalBlock::new,
+		BlockBehaviour.Properties.of()
+			.noCollision()
+			.randomTicks()
+			.strength(-1.0F)
+			.sound(SoundType.GLASS)
+			.lightLevel(state -> 11)
+			.pushReaction(PushReaction.BLOCK)
+			.noLootTable()
+	);
+
 	/** Blok model-saja untuk menggambar lapisan di sisi blok mana pun (tanpa item, tidak ada di dunia). */
 	public static final CoverDisplayBlock COVER_DISPLAY = (CoverDisplayBlock) registerBlock(
 		"cover_display",
@@ -88,6 +131,8 @@ public final class ModBlocks {
 			output.accept(SCREW_PILES);
 			output.accept(CEILING);
 			output.accept(LAMP);
+			output.accept(MAGNET);
+			output.accept(SIREN);
 			output.accept(WALLPAPER);
 			output.accept(WALLPAPERS);
 			output.accept(CARPET);

@@ -2,15 +2,36 @@
   "lamp_flicker": {
     "subtitle": "subtitles.backrooms.lamp_flicker",
     "sounds": [
-      { "name": "backrooms:lamp_flicker", "pitch": 0.9 },
-      { "name": "backrooms:lamp_flicker", "pitch": 1.0 },
-      { "name": "backrooms:lamp_flicker", "pitch": 1.1 }
+      {
+        "name": "backrooms:lamp_flicker",
+        "pitch": 0.9
+      },
+      {
+        "name": "backrooms:lamp_flicker",
+        "pitch": 1.0
+      },
+      {
+        "name": "backrooms:lamp_flicker",
+        "pitch": 1.1
+      }
     ]
   },
   "untitled": {
     "subtitle": "subtitles.backrooms.untitled",
     "sounds": [
-      { "name": "backrooms:untitled" }
+      {
+        "name": "backrooms:untitled"
+      }
+    ]
+  },
+  "siren_alarm": {
+    "subtitle": "subtitles.backrooms.siren_alarm",
+    "sounds": [
+      {
+        "name": "backrooms:siren_alarm",
+        "volume": 1.0,
+        "attenuation_distance": 64
+      }
     ]
   }
 }

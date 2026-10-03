@@ -8,6 +8,7 @@ import net.minecraft.sounds.SoundEvent;
 public final class ModSounds {
 	public static final SoundEvent LAMP_FLICKER = register("lamp_flicker");
 	public static final SoundEvent UNTITLED = register("untitled");
+	public static final SoundEvent SIREN_ALARM = register("siren_alarm");
 
 	private ModSounds() {
 	}

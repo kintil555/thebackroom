@@ -1,6 +1,8 @@
 {
   "values": [
     "backrooms:screw_piles",
-    "backrooms:ceiling"
+    "backrooms:ceiling",
+    "backrooms:magnet",
+    "backrooms:siren"
   ]
 }

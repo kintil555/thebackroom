@@ -1,6 +1,7 @@
 package com.backrooms;
 
 import com.backrooms.block.CoveredBlockEntity;
+import com.backrooms.block.SirenBlockEntity;
 import java.util.Set;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -12,6 +13,10 @@ import net.minecraft.world.level.block.entity.BlockEntityType;
 public final class ModBlockEntities {
 	public static final BlockEntityType<CoveredBlockEntity> COVERED_BLOCK = register(
 		"covered_block", new BlockEntityType<>(CoveredBlockEntity::new, Set.of(ModBlocks.COVERED_BLOCK))
+	);
+
+	public static final BlockEntityType<SirenBlockEntity> SIREN = register(
+		"siren", new BlockEntityType<>(SirenBlockEntity::new, Set.of(ModBlocks.SIREN))
 	);
 
 	private ModBlockEntities() {
