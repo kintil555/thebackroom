@@ -18,22 +18,32 @@ import net.minecraft.world.phys.Vec3;
  * Urutan suara satu portal yang sedang mengisi energi (waktu dihitung dalam tick sejak glow mulai):
  * <ul>
  *   <li>{@code rising} mulai 2 detik setelah pengisian dimulai dan diputar sampai habis.</li>
- *   <li>{@code burst_energy} (sudah didistorsi dan keras) mulai 1 detik sebelum rising habis.</li>
+ *   <li>{@code burst_energy} mulai {@link #BURST_AT_SECONDS} detik setelah pengisian dimulai, tepat saat bloom melebar
+ *       mendadak (kurva RISE_CURVE di {@link PortalGlowRenderer}); dilapis beberapa pitch agar keras dan kasar.</li>
  *   <li>{@code loop}: 3 suara berbeda pitch, mulai bersama rising, berulang sampai burst habis, lalu fade out.</li>
- *   <li>{@code after_portal_spawn} mulai 1 detik sebelum burst habis (akhirnya sudah di-fade pada file).</li>
+ *   <li>{@code after_portal_spawn} diputar {@link #AFTER_DELAY_SECONDS} detik setelah portal terbuka (bukan saat terbuka).</li>
  * </ul>
  */
 final class PortalChargeSounds {
 	private static final int TICKS_PER_SECOND = 20;
 	private static final double RISING_SECONDS = 5.08;
 	private static final double BURST_SECONDS = 2.0;
-	private static final double OVERLAP_SECONDS = 1.0;
+	/** Burst mulai di sini (detik sejak pengisian dimulai); selesai bersamaan dengan portal terbuka (10 detik). */
+	private static final double BURST_AT_SECONDS = 8.0;
+	/** Jeda after_portal_spawn setelah portal terbuka. */
+	private static final double AFTER_DELAY_SECONDS = 2.0;
 
 	private static final int RISING_START = ticks(2.0);
 	private static final int RISING_END = RISING_START + ticks(RISING_SECONDS);
-	private static final int BURST_START = RISING_END - ticks(OVERLAP_SECONDS);
+	private static final int BURST_START = ticks(BURST_AT_SECONDS);
 	private static final int BURST_END = BURST_START + ticks(BURST_SECONDS);
-	private static final int AFTER_START = BURST_END - ticks(OVERLAP_SECONDS);
+	private static final int AFTER_DELAY = ticks(AFTER_DELAY_SECONDS);
+
+	/**
+	 * Lapisan burst {pitch, volume}. Volume suara Minecraft dibatasi 1.0 oleh engine, jadi keras dan "kotor" didapat
+	 * dengan menumpuk salinan yang sedikit tidak selaras (detune) ditambah satu lapisan sub-bass.
+	 */
+	private static final float[][] BURST_LAYERS = {{1.0f, 1.0f}, {0.93f, 1.0f}, {1.07f, 0.9f}, {0.5f, 0.8f}};
 
 	/** Loop mulai bersama rising dan berhenti saat burst habis. */
 	private static final int LOOP_START = RISING_START;
@@ -59,24 +69,31 @@ final class PortalChargeSounds {
 		return (int) Math.round(seconds * TICKS_PER_SECOND);
 	}
 
-	/** Dipanggil tiap tick client dengan jumlah tick sejak pengisian dimulai. */
-	void tick(long elapsedTicks) {
+	/**
+	 * Dipanggil tiap tick client.
+	 *
+	 * @param elapsedTicks   tick sejak pengisian dimulai
+	 * @param sinceOpenTicks tick sejak portal terbuka, atau -1 selama portal belum terbuka
+	 */
+	void tick(long elapsedTicks, long sinceOpenTicks) {
 		SoundManager soundManager = Minecraft.getInstance().getSoundManager();
 		if (!this.risingPlayed && elapsedTicks >= RISING_START) {
 			this.risingPlayed = true;
 			if (elapsedTicks < RISING_END) {
-				this.playOneShot(soundManager, ModSounds.PORTAL_RISING);
+				this.playOneShot(soundManager, ModSounds.PORTAL_RISING, 1.0f, 1.0f);
 			}
 		}
 		if (!this.burstPlayed && elapsedTicks >= BURST_START) {
 			this.burstPlayed = true;
 			if (elapsedTicks < BURST_END) {
-				this.playOneShot(soundManager, ModSounds.PORTAL_BURST_ENERGY);
+				for (float[] layer : BURST_LAYERS) {
+					this.playOneShot(soundManager, ModSounds.PORTAL_BURST_ENERGY, layer[1], layer[0]);
+				}
 			}
 		}
-		if (!this.afterPlayed && elapsedTicks >= AFTER_START) {
+		if (!this.afterPlayed && sinceOpenTicks >= AFTER_DELAY) {
 			this.afterPlayed = true;
-			this.playOneShot(soundManager, ModSounds.PORTAL_AFTER_SPAWN);
+			this.playOneShot(soundManager, ModSounds.PORTAL_AFTER_SPAWN, 1.0f, 1.0f);
 		}
 		this.tickLoop(soundManager, elapsedTicks);
 	}
@@ -105,9 +122,9 @@ final class PortalChargeSounds {
 		}
 	}
 
-	private void playOneShot(SoundManager soundManager, SoundEvent event) {
+	private void playOneShot(SoundManager soundManager, SoundEvent event, float volume, float pitch) {
 		SimpleSoundInstance instance = new SimpleSoundInstance(
-			event, SoundSource.BLOCKS, 1.0f, 1.0f, RandomSource.create(), this.position.x, this.position.y, this.position.z);
+			event, SoundSource.BLOCKS, volume, pitch, RandomSource.create(), this.position.x, this.position.y, this.position.z);
 		this.oneShots.add(instance);
 		soundManager.play(instance);
 	}

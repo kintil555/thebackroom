@@ -3,6 +3,7 @@
   "package": "com.backrooms.mixin.client",
   "compatibilityLevel": "JAVA_25",
   "client": [
+    "CameraShakeMixin",
     "ClientPacketListenerMixin",
     "DebugLookingAtStateMixin",
     "DebugLookingAtTagsMixin",

@@ -61,6 +61,11 @@ public final class PortalGlowManager {
 		ClientTickEvents.END_CLIENT_TICK.register(client -> tick(client.level));
 	}
 
+	/** Offset (derajat) goyangan kamera dari semua portal yang baru terbuka: {yaw, pitch}. */
+	public static float[] shakeOffset(double nowTicks, Vec3 cameraPos) {
+		return PortalShake.offset(SOURCES, nowTicks, cameraPos);
+	}
+
 	static List<Source> sources() {
 		return SOURCES;
 	}
@@ -89,10 +94,10 @@ public final class PortalGlowManager {
 		Iterator<Source> iterator = SOURCES.iterator();
 		while (iterator.hasNext()) {
 			Source source = iterator.next();
-			source.sounds.tick(now - source.startTick);
 			if (source.openedTick < 0L && level.getBlockState(source.center).is(ModBlocks.PLACEHOLDER_PORTAL)) {
 				source.openedTick = now;
 			}
+			source.sounds.tick(now - source.startTick, source.openedTick < 0L ? -1L : now - source.openedTick);
 			boolean opened = source.openedTick >= 0L;
 			boolean charging = !opened && now - source.startTick < source.durationTicks;
 			boolean finished = opened && now - source.openedTick >= AFTER_OPEN_TICKS;
