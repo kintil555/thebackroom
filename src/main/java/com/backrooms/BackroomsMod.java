@@ -5,6 +5,7 @@ import com.backrooms.block.ScrewPilesBlock;
 import com.backrooms.cover.CoverAttachments;
 import com.backrooms.cover.CoverManager;
 import com.backrooms.network.MoodPeakPayload;
+import com.backrooms.network.PortalChargePayload;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents;
@@ -34,6 +35,8 @@ public class BackroomsMod implements ModInitializer {
 
 		// Mood player 100% (dilaporkan client) memadamkan lampu sekitar selama 2 menit.
 		PayloadTypeRegistry.serverboundPlay().register(MoodPeakPayload.TYPE, MoodPeakPayload.CODEC);
+		// Magnet mulai mengisi energi: client menggambar glow berkedip di tengah bingkai portal.
+		PayloadTypeRegistry.clientboundPlay().register(PortalChargePayload.TYPE, PortalChargePayload.CODEC);
 		ServerPlayNetworking.registerGlobalReceiver(MoodPeakPayload.TYPE, (payload, context) -> LampBlackout.trigger(context.player()));
 		ServerTickEvents.END_SERVER_TICK.register(LampBlackout::tick);
 

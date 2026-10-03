@@ -2,6 +2,7 @@ package com.backrooms.client;
 
 import com.backrooms.ModBlockEntities;
 import com.backrooms.ModBlocks;
+import com.backrooms.client.glow.PortalGlowManager;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.model.loading.v1.ModelLoadingPlugin;
 import net.fabricmc.fabric.api.client.model.loading.v1.ModelModifier;
@@ -12,6 +13,7 @@ public class BackroomsClient implements ClientModInitializer {
 	@Override
 	public void onInitializeClient() {
 		ClientCovers.init();
+		PortalGlowManager.init();
 		BlockEntityRenderers.register(ModBlockEntities.SIREN, SirenRenderer::new);
 
 		// Bungkus model semua blok biasa agar carpet (attachment chunk) ikut tergambar. Screw Piles menggambar

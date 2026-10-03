@@ -14,6 +14,10 @@ Retak (crack) dan partikel saat break hanya muncul di sisi yang berlapis. Jika b
 
 Item ada di creative tab **Building Blocks**.
 
+## Efek glow portal
+
+Saat bingkai Magnet lengkap dialiri redstone, selama 10 detik pengisian energi muncul bloom cerah berkedip di tengah ruang portal 3x5, lalu hilang ketika portal terbuka. Setelan (radius, warna, kecerahan awal) ada di konstanta atas `PortalGlowRenderer`; pola kedip di `PortalGlowFlicker`; bentuk glow di `assets/backrooms/shaders/post/portal_glow.fsh`.
+
 ## Build
 Butuh JDK 25.
 

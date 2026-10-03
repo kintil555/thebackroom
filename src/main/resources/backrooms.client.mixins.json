@@ -6,6 +6,7 @@
     "ClientPacketListenerMixin",
     "DebugLookingAtStateMixin",
     "DebugLookingAtTagsMixin",
+    "GameRendererGlowMixin",
     "ItemModelResolverMixin",
     "LevelRendererMixin",
     "MultiPlayerGameModeMixin",

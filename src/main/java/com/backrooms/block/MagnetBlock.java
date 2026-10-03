@@ -1,5 +1,7 @@
 package com.backrooms.block;
 
+import com.backrooms.network.PortalChargePayload;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.particles.ParticleTypes;
@@ -39,6 +41,8 @@ public class MagnetBlock extends Block {
 	public static final int WARNING_TICKS = 200;
 	/** Sirine mulai berbunyi 4 detik setelah power menyala. */
 	public static final int SIREN_DELAY_TICKS = 80;
+	/** Pemain dalam jarak ini (blok) dari tengah bingkai menerima efek glow pengisian energi. */
+	private static final double GLOW_SYNC_RANGE_SQ = 128.0 * 128.0;
 
 	public MagnetBlock(Properties properties) {
 		super(properties);
@@ -93,6 +97,18 @@ public class MagnetBlock extends Block {
 			serverLevel.setBlock(magnetPos, magnetState.setValue(ACTIVE, true).setValue(WARNING, false), Block.UPDATE_ALL);
 			boolean leader = magnetPos.equals(frame.magnets().get(0));
 			serverLevel.scheduleTick(magnetPos, this, leader ? SIREN_DELAY_TICKS : WARNING_TICKS);
+		}
+		syncChargeGlow(serverLevel, frame);
+	}
+
+	/** Beri tahu client di sekitar bingkai agar menggambar glow berkedip di tengah portal selama pengisian energi. */
+	private static void syncChargeGlow(ServerLevel level, MagnetFrame frame) {
+		BlockPos center = frame.center();
+		PortalChargePayload payload = new PortalChargePayload(frame.magnets().get(0), center, WARNING_TICKS);
+		for (ServerPlayer player : level.players()) {
+			if (player.blockPosition().distSqr(center) < GLOW_SYNC_RANGE_SQ) {
+				ServerPlayNetworking.send(player, payload);
+			}
 		}
 	}
 
