@@ -77,6 +77,14 @@ public class LampBlock extends Block {
 	}
 
 	@Override
+	protected void onPlace(BlockState state, Level level, BlockPos pos, BlockState oldState, boolean movedByPiston) {
+		super.onPlace(state, level, pos, oldState, movedByPiston);
+		if (level.isClientSide()) {
+			com.backrooms.client.light.LampBloomRenderer.notifyPlaced(pos);
+		}
+	}
+
+	@Override
 	protected void randomTick(BlockState state, ServerLevel level, BlockPos pos, RandomSource random) {
 		if (LampBlackout.isBlackedOut(level, pos)) {
 			return; // sedang dipadamkan event blackout (mood 100%)

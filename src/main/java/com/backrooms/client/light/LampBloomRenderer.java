@@ -63,6 +63,11 @@ public final class LampBloomRenderer {
 	private LampBloomRenderer() {
 	}
 
+	/** Dipanggil dari sisi client saat Lamp diletakkan agar bloom langsung muncul. */
+	public static void notifyPlaced(net.minecraft.core.BlockPos pos) {
+		LampBloom.addCandidate(pos);
+	}
+
 	/** Dipanggil tiap frame setelah dunia tergambar, sebelum glow portal dan GUI. Tidak melakukan apa pun jika tak ada Lamp menyala di pandangan. */
 	public static void render(RenderTarget main, CrossFrameResourcePool pool, DeltaTracker deltaTracker) {
 		Minecraft minecraft = Minecraft.getInstance();

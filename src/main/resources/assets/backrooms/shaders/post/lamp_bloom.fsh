@@ -68,6 +68,12 @@ void main() {
     vec4 world = inverseMatrix * vec4(ndc, ndcZ, 1.0);
     vec3 scenePosition = abs(world.w) > 1.0e-8 ? world.xyz / world.w : vec3(1.0e6);
     float sceneDistance = length(scenePosition);
+    bool hasSurface = depth < 0.9999;
+    // Normal permukaan (menghadap kamera) dari turunan posisi; dipakai agar dinding yang menutupi Lamp tidak ikut berpendar.
+    vec3 surfaceNormal = normalize(cross(dFdx(scenePosition), dFdy(scenePosition)));
+    if (dot(surfaceNormal, scenePosition) > 0.0) {
+        surfaceNormal = -surfaceNormal;
+    }
 
     // Arah sinar dari titik di kedalaman tengah (aman juga untuk langit yang depth-nya di ujung).
     vec4 mid = inverseMatrix * vec4(ndc, zeroToOne ? 0.5 : 0.0, 1.0);
@@ -101,7 +107,17 @@ void main() {
                 low = a;
             }
         }
-        float closest = max(sdBox(direction * (0.5 * (low + high)) - center), 0.0);
+        float tClosest = 0.5 * (low + high);
+        float closest = max(sdBox(direction * tClosest - center), 0.0);
+        // Titik pada permukaan terlihat: titik terdekat kotak Lamp tidak boleh berada di belakang bidang permukaan
+        // (Lamp di balik dinding). Permukaan rata dengan Lamp (titik terdekat di bidang yang sama) tetap lolos.
+        if (hasSurface && tClosest > sceneDistance - 0.05) {
+            vec3 rel = scenePosition - center;
+            vec3 boxPoint = center + clamp(rel, vec3(-HALF_SIZE), vec3(HALF_SIZE));
+            if (dot(surfaceNormal, boxPoint - scenePosition) < -0.03) {
+                continue;
+            }
+        }
         if (closest >= radius) {
             continue;
         }

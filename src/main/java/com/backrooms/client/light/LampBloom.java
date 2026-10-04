@@ -72,6 +72,14 @@ final class LampBloom {
 	record Lamp(Vec3 center, float strength) {
 	}
 
+	/** Daftarkan Lamp yang baru diletakkan segera, tanpa menunggu rescan berkala. */
+	static void addCandidate(BlockPos pos) {
+		BlockPos immutable = pos.immutable();
+		if (!CANDIDATES.contains(immutable) && CANDIDATES.size() < MAX_CANDIDATES) {
+			CANDIDATES.add(immutable);
+		}
+	}
+
 	/** Reset saat keluar dunia; warna dibaca ulang pada sesi berikutnya (resource pack bisa berubah). */
 	static void clear() {
 		CANDIDATES.clear();
@@ -118,8 +126,10 @@ final class LampBloom {
 			}
 			// Bloom tidak boleh tembus dinding: Lamp yang semua sisi menghadap kameranya tertutup blok memudar ke 0.
 			long key = pos.asLong();
-			float previous = VISIBILITY.getOrDefault(key, 0.0f);
-			float visibility = Mth.lerp(Math.min(1.0f, frameSeconds * VISIBILITY_RATE), previous, canSee(level, eye, center) ? 1.0f : 0.0f);
+			float target = canSee(level, eye, center) ? 1.0f : 0.0f;
+			// Lamp baru (belum punya riwayat) langsung memakai target agar bloom tidak fade-in lambat saat dipasang.
+			float previous = VISIBILITY.getOrDefault(key, target);
+			float visibility = Mth.lerp(Math.min(1.0f, frameSeconds * VISIBILITY_RATE), previous, target);
 			if (visibility < 0.01f) {
 				nextVisibility.put(key, 0.0f);
 				continue;
