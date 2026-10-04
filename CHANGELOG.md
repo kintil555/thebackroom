@@ -35,3 +35,4 @@
 - Portal: jejak motion trail tetap penuh sampai jarak 10 blok dari portal, memudar sampai 16 blok (sebelumnya mengikuti falloff flash dan kekuatan tetap saat portal terbuka)
 - Portal: semua efek layar (bloom, warp, exposure, flashbang, bayangan sisa, jejak) hanya digambar selagi portal terlihat dari kamera; berlindung di balik blok memudarkannya ke 0. Cek garis pandang ke tengah, atas, dan bawah ruang portal
 - Lamp: bloom post effect untuk Lamp menyala. Bentuknya kotak 1 blok yang meluas 0,3 blok di luar tepinya, berwarna dari tekstur Lamp (rata-rata piksel terang), memakai depth buffer sehingga tidak tembus dinding. Maksimal 16 Lamp terdekat di pandangan, memudar antara 24 dan 40 blok. Ikut berkedip bersama Lamp
+- Fix Lamp bloom: tidak lagi tembus dinding (cek garis pandang CPU per Lamp dengan fade halus, selain oklusi depth di shader) dan lebih redup (halo 0,28, inti Lamp hanya ditambah 30%, putih inti 0,12)

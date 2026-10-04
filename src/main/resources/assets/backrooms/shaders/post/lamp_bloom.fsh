@@ -31,10 +31,12 @@ const int FIRST_LAMP_ROW = 2;
 const float HALF_SIZE = 0.5;
 // Setengah diagonal kubus: sinar yang lebih jauh dari ini (ditambah radius) dari pusat tidak mungkin menyentuh bloom.
 const float HALF_DIAGONAL = 0.8660254;
-// Kecerahan bloom di dalam kotak dan di tepinya; menurun halus sampai 0 pada jarak RADIUS.
-const float PEAK = 0.6;
-// Seberapa jauh inti bloom memutih (0 = murni warna tekstur, 1 = putih).
-const float WHITE_CORE = 0.45;
+// Kecerahan halo tepat di luar tepi kotak; menurun halus sampai 0 pada jarak RADIUS.
+const float PEAK = 0.28;
+// Di dalam kotak (permukaan Lamp itu sendiri, yang sudah terang) hanya ditambah sebagian kecil agar teksturnya tidak terbakar putih.
+const float CORE_SCALE = 0.3;
+// Seberapa jauh halo memutih (0 = murni warna tekstur, 1 = putih).
+const float WHITE_CORE = 0.12;
 const int SEARCH_STEPS = 12;
 
 float fetchFloat(int x, int y) {
@@ -105,6 +107,9 @@ void main() {
         }
         float amount = 1.0 - smoothstep(0.0, radius, closest);
         amount *= amount;
+        if (closest <= 0.001) {
+            amount *= CORE_SCALE;
+        }
         vec3 hot = mix(colorData.rgb, vec3(1.0), WHITE_CORE * amount);
         additive += hot * amount * PEAK * colorData.a;
     }

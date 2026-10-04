@@ -3,11 +3,14 @@ package com.backrooms.client.light;
 import com.backrooms.BackroomsMod;
 import com.backrooms.ModBlocks;
 import com.backrooms.block.LampBlock;
+import com.backrooms.client.glow.PortalSight;
 import com.mojang.blaze3d.platform.NativeImage;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
@@ -47,7 +50,15 @@ final class LampBloom {
 	/** Dipakai jika tekstur tidak bisa dibaca atau tidak punya piksel terang. */
 	private static final float[] FALLBACK_TINT = {1.0f, 0.93f, 0.72f};
 
+	/** Kecepatan fade keterlihatan Lamp (per detik) saat masuk/keluar dari balik blok. */
+	private static final float VISIBILITY_RATE = 12.0f;
+	/** Titik bidik di luar permukaan Lamp (blok dari pusat; sisi blok = 0,5). */
+	private static final double FACE_AIM_OFFSET = 0.56;
+
 	private static final List<BlockPos> CANDIDATES = new ArrayList<>();
+	/** Keterlihatan hasil smoothing per Lamp (BlockPos.asLong); hanya Lamp yang masih di pandangan yang disimpan. */
+	private static final Map<Long, Float> VISIBILITY = new HashMap<>();
+	private static long lastFrameNanos;
 	private static final Matrix4f MATRIX = new Matrix4f();
 	private static final Vector4f TMP = new Vector4f();
 	private static @Nullable ClientLevel scannedLevel;
@@ -64,6 +75,7 @@ final class LampBloom {
 	/** Reset saat keluar dunia; warna dibaca ulang pada sesi berikutnya (resource pack bisa berubah). */
 	static void clear() {
 		CANDIDATES.clear();
+		VISIBILITY.clear();
 		scannedLevel = null;
 		tint = null;
 	}
@@ -89,6 +101,10 @@ final class LampBloom {
 			return List.of();
 		}
 		camera.getViewRotationProjectionMatrix(MATRIX);
+		long nowNanos = System.nanoTime();
+		float frameSeconds = lastFrameNanos == 0L ? 0.016f : Math.min(0.1f, (nowNanos - lastFrameNanos) / 1.0e9f);
+		lastFrameNanos = nowNanos;
+		Map<Long, Float> nextVisibility = new HashMap<>();
 		List<Lamp> lamps = new ArrayList<>();
 		for (BlockPos pos : CANDIDATES) {
 			BlockState state = level.getBlockState(pos);
@@ -100,11 +116,40 @@ final class LampBloom {
 			if (distance >= FAR_BLOCKS || !inView(center, eye, distance)) {
 				continue;
 			}
-			float strength = 1.0f - smooth((distance - NEAR_BLOCKS) / (FAR_BLOCKS - NEAR_BLOCKS));
+			// Bloom tidak boleh tembus dinding: Lamp yang semua sisi menghadap kameranya tertutup blok memudar ke 0.
+			long key = pos.asLong();
+			float previous = VISIBILITY.getOrDefault(key, 0.0f);
+			float visibility = Mth.lerp(Math.min(1.0f, frameSeconds * VISIBILITY_RATE), previous, canSee(level, eye, center) ? 1.0f : 0.0f);
+			if (visibility < 0.01f) {
+				nextVisibility.put(key, 0.0f);
+				continue;
+			}
+			nextVisibility.put(key, visibility);
+			float strength = (1.0f - smooth((distance - NEAR_BLOCKS) / (FAR_BLOCKS - NEAR_BLOCKS))) * visibility;
 			lamps.add(new Lamp(center, strength));
 		}
+		VISIBILITY.clear();
+		VISIBILITY.putAll(nextVisibility);
 		lamps.sort(Comparator.comparingDouble(lamp -> lamp.center().distanceToSqr(eye)));
 		return lamps.size() > MAX_LAMPS ? lamps.subList(0, MAX_LAMPS) : lamps;
+	}
+
+	/**
+	 * True jika salah satu sisi Lamp yang menghadap kamera terlihat: garis pandang ke tengah sisi itu (sedikit di luar
+	 * permukaan) tidak terhalang blok yang menutup pandangan. Kaca dan iron bars tidak dianggap penghalang.
+	 */
+	private static boolean canSee(ClientLevel level, Vec3 eye, Vec3 center) {
+		Vec3 toEye = eye.subtract(center);
+		if (toEye.lengthSqr() < 1.0) {
+			return true;
+		}
+		if (Math.abs(toEye.x) > 0.5 && PortalSight.clear(level, eye, center.add(Math.signum(toEye.x) * FACE_AIM_OFFSET, 0.0, 0.0))) {
+			return true;
+		}
+		if (Math.abs(toEye.y) > 0.5 && PortalSight.clear(level, eye, center.add(0.0, Math.signum(toEye.y) * FACE_AIM_OFFSET, 0.0))) {
+			return true;
+		}
+		return Math.abs(toEye.z) > 0.5 && PortalSight.clear(level, eye, center.add(0.0, 0.0, Math.signum(toEye.z) * FACE_AIM_OFFSET));
 	}
 
 	/** Pusat di depan kamera atau sangat dekat; di luar layar dibuang dengan margin lebar (bloom hanya meluas 0,3 blok). */
