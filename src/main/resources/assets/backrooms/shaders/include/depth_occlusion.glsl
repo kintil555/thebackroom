@@ -95,3 +95,26 @@ float depthOcclusionOpenness(sampler2D depthTex, vec2 depthSize, sampler2D dataT
     sum += depOccOpenAt(depthTex, depthSize, inverseMatrix, zeroToOne, nearD, farD, planeThickness, center, normal, radius, halfHeight, uv - vec2(0.0, texel.y));
     return sum / 6.0;
 }
+
+// Seperti depthOcclusionOpenness, tetapi bidang dianggap tak terbatas: hanya permukaan yang berada di depan bidang sumber (melebihi planeThickness)
+// yang menutupi. Tidak ada peralihan bidang/titik, jadi tidak ada batas bulat yang terlihat. Pakai untuk efek yang mengubah/memelintir gambar
+// (distorsi, blur, lensa), bukan untuk glow aditif.
+float depthOcclusionPlaneOpenness(sampler2D depthTex, vec2 depthSize, sampler2D dataTex, int firstRow, int sourceIndex, vec2 uv) {
+    mat4 inverseMatrix = depOccFetchMatrix(dataTex, firstRow);
+    int header = firstRow + 1;
+    bool zeroToOne = depOccFetchFloat(dataTex, 0, header) > 0.5;
+    float nearD = depOccFetchFloat(dataTex, 1, header);
+    float farD = depOccFetchFloat(dataTex, 2, header);
+    float planeThickness = depOccFetchFloat(dataTex, 3, header);
+    int row = firstRow + 2 + sourceIndex;
+    vec3 center = depOccFetchVec3(dataTex, 0, row);
+    vec3 normal = depOccFetchVec3(dataTex, 3, row);
+    vec2 texel = 1.5 / depthSize;
+    const float BIG = 1.0e6;
+    float sum = 2.0 * depOccOpenAt(depthTex, depthSize, inverseMatrix, zeroToOne, nearD, farD, planeThickness, center, normal, BIG, 0.0, uv);
+    sum += depOccOpenAt(depthTex, depthSize, inverseMatrix, zeroToOne, nearD, farD, planeThickness, center, normal, BIG, 0.0, uv + vec2(texel.x, 0.0));
+    sum += depOccOpenAt(depthTex, depthSize, inverseMatrix, zeroToOne, nearD, farD, planeThickness, center, normal, BIG, 0.0, uv - vec2(texel.x, 0.0));
+    sum += depOccOpenAt(depthTex, depthSize, inverseMatrix, zeroToOne, nearD, farD, planeThickness, center, normal, BIG, 0.0, uv + vec2(0.0, texel.y));
+    sum += depOccOpenAt(depthTex, depthSize, inverseMatrix, zeroToOne, nearD, farD, planeThickness, center, normal, BIG, 0.0, uv - vec2(0.0, texel.y));
+    return sum / 6.0;
+}

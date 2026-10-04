@@ -103,7 +103,7 @@ void main() {
     if (warp > 0.001 && nearRadius > 1.0) {
         float radial = 1.0 - smoothstep(0.35, 1.25, length((pixel - nearCenter) / nearRadius));
         if (radial > 0.001) {
-            warpMask = radial * depthOcclusionOpenness(DepthSampler, DepthSize, DataSampler, OCCLUSION_ROW, 0, texCoord);
+            warpMask = radial * depthOcclusionPlaneOpenness(DepthSampler, DepthSize, DataSampler, OCCLUSION_ROW, 0, texCoord);
         }
     }
     float warpHere = warp * warpMask;

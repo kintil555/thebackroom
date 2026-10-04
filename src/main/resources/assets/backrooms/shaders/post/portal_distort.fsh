@@ -215,7 +215,7 @@ void main() {
             }
         }
         // Piksel yang permukaan terlihatnya menutupi bidang portal tidak ikut efek (tengah tertutup tidak mematikan sisanya).
-        float open = depthOcclusionOpenness(DepthSampler, DepthSize, DataSampler, OCCLUSION_ROW, i, texCoord);
+        float open = depthOcclusionPlaneOpenness(DepthSampler, DepthSize, DataSampler, OCCLUSION_ROW, i, texCoord);
         if (open <= 0.001) {
             continue;
         }
