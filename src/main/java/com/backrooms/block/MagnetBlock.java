@@ -42,6 +42,8 @@ public class MagnetBlock extends Block {
 	public static final int WARNING_TICKS = 200;
 	/** Sirine mulai berbunyi 4 detik setelah power menyala. */
 	public static final int SIREN_DELAY_TICKS = 80;
+	/** Jeda setelah portal terbuka sebelum daya diperiksa lagi (menutup portal jika redstone sudah padam). */
+	private static final int POWER_RECHECK_TICKS = 20;
 	/** Pemain dalam jarak ini (blok) dari tengah bingkai menerima efek glow pengisian energi. */
 	private static final double GLOW_SYNC_RANGE_SQ = 128.0 * 128.0;
 
@@ -79,6 +81,25 @@ public class MagnetBlock extends Block {
 	@Override
 	protected void neighborChanged(BlockState state, Level level, BlockPos pos, Block block, @Nullable Orientation orientation, boolean movedByPiston) {
 		tryActivate(level, pos, state);
+		if (level instanceof ServerLevel serverLevel) {
+			closeIfUnpowered(serverLevel, pos);
+		}
+	}
+
+	/** Memicu pengisian energi di Magnet {@code pos} (dipakai setelah portal selesai menutup, jika redstone sudah menyala lagi). */
+	public static void recheck(ServerLevel level, BlockPos pos) {
+		BlockState state = level.getBlockState(pos);
+		if (state.getBlock() instanceof MagnetBlock magnet) {
+			magnet.tryActivate(level, pos, state);
+		}
+	}
+
+	/** Portal terbuka tetapi tidak ada Magnet yang lagi bertenaga: mulai animasi penutupan. */
+	private static void closeIfUnpowered(ServerLevel level, BlockPos pos) {
+		MagnetFrame frame = MagnetFrame.find(level, pos, false);
+		if (frame != null && BackroomsPortals.isOpen(level, frame.center()) && !frame.isPowered(level)) {
+			BackroomsPortals.beginClose(level, frame);
+		}
 	}
 
 	/** Mulai hitung mundur jika bingkai lengkap dan salah satu Magnet bertenaga (juga saat Magnet terakhir baru dipasang). */
@@ -91,8 +112,8 @@ public class MagnetBlock extends Block {
 			reportDebug(serverLevel, pos, frame);
 			return;
 		}
-		if (BackroomsPortals.isOpen(serverLevel, frame.center())) {
-			// Portal sudah terbuka di bingkai ini: tidak mengisi energi lagi.
+		if (BackroomsPortals.isBusy(serverLevel, frame.center())) {
+			// Portal sudah terbuka (atau sedang menutup) di bingkai ini: tidak mengisi energi lagi.
 			return;
 		}
 		// Semua Magnet bingkai ditandai ACTIVE. Magnet pertama (pemimpin) menyalakan sirine setelah SIREN_DELAY_TICKS,
@@ -135,6 +156,8 @@ public class MagnetBlock extends Block {
 	@Override
 	protected void tick(BlockState state, ServerLevel level, BlockPos pos, RandomSource random) {
 		if (!state.getValue(ACTIVE)) {
+			// Pemeriksaan lanjutan setelah portal terbuka: daya yang hanya berupa pulsa menutup portal lagi.
+			closeIfUnpowered(level, pos);
 			return;
 		}
 		MagnetFrame frame = MagnetFrame.find(level, pos, false);
@@ -154,6 +177,7 @@ public class MagnetBlock extends Block {
 		// Bingkai masih utuh: buka (daya boleh hanya pulsa). Tick Magnet lain menemukan ruang sudah terisi, jadi tidak ganda.
 		if (frame != null) {
 			frame.openPortal(level);
+			level.scheduleTick(pos, this, POWER_RECHECK_TICKS);
 		}
 	}
 

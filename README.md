@@ -18,6 +18,8 @@ Item ada di creative tab **Building Blocks**.
 
 Saat bingkai Magnet lengkap dialiri redstone, selama 10 detik pengisian energi muncul bloom cerah berkedip di tengah ruang portal 3x5, lalu hilang ketika portal terbuka. Setelan (radius, warna, kecerahan awal) ada di konstanta atas `PortalGlowRenderer`; pola kedip di `PortalGlowFlicker`; bentuk glow di `assets/backrooms/shaders/post/portal_glow.fsh`.
 
+Selama pengisian energi, bingkai juga dipenuhi api hijau yang mengalir memutar seperti fluida (shader layar `portal_distort.fsh`, fungsi `flame`). Setelah portal terbuka, isi portal terdistorsi melengkung secara permanen. Portal menutup saat tidak ada Magnet yang dialiri redstone: distorsi menguat, putih kehijauan bercahaya, lalu mengecil ke tengah dan hilang (`closeGlow`; durasi `BackroomsPortals.CLOSE_TICKS`, setelan lain di konstanta atas shader dan `PortalDistortRenderer`).
+
 ## Build
 Butuh JDK 25.
 

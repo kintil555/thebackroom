@@ -3,6 +3,7 @@ package com.backrooms.client.glow;
 import com.backrooms.block.MagnetFrame;
 import com.backrooms.client.light.ColoredLights;
 import com.backrooms.network.PortalChargePayload;
+import com.backrooms.network.PortalClosingPayload;
 import com.backrooms.network.PortalOpenedPayload;
 import net.minecraft.core.Direction;
 import net.minecraft.util.Mth;
@@ -63,8 +64,8 @@ public final class PortalGlowManager {
 		final PortalChargeSounds sounds;
 		/** Keterlihatan hasil smoothing 0..1: turun saat tengah portal terhalang blok dari kamera. */
 		float visibility;
-		/** Fase putaran aliran api hijau di tepi bingkai (lap, bertambah tiap tick); lihat {@link PortalFlames}. */
-		float flamePhase;
+		/** Keterlihatan api hijau pengisian energi (smoothing 0..1), terpisah dari {@link #visibility}; lihat {@link PortalDistortRenderer}. */
+		float flameVisibility;
 
 		Source(BlockPos leader, BlockPos center, long startTick, int durationTicks, Direction right) {
 			this.right = right;
@@ -140,6 +141,8 @@ public final class PortalGlowManager {
 			(payload, context) -> onCharge(payload, context.client().level));
 		ClientPlayNetworking.registerGlobalReceiver(PortalOpenedPayload.TYPE,
 			(payload, context) -> OpenPortals.onOpened(payload, context.client().level));
+		ClientPlayNetworking.registerGlobalReceiver(PortalClosingPayload.TYPE,
+			(payload, context) -> OpenPortals.onClosing(payload, context.client().level));
 		ClientTickEvents.END_CLIENT_TICK.register(client -> tick(client.level));
 	}
 
@@ -191,7 +194,6 @@ public final class PortalGlowManager {
 			}
 			source.sounds.tick(now - source.startTick, source.openedTick < 0L ? -1L : now - source.openedTick);
 			PortalSparks.tick(level, source, now);
-			PortalFlames.tick(level, source, now);
 			boolean opened = source.openedTick >= 0L;
 			boolean charging = !opened && now - source.startTick < source.durationTicks;
 			boolean finished = opened && now - source.openedTick >= AFTER_OPEN_TICKS;

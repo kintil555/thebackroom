@@ -6,8 +6,11 @@ import com.backrooms.cover.CoverAttachments;
 import com.backrooms.cover.CoverManager;
 import com.backrooms.network.MoodPeakPayload;
 import com.backrooms.network.PortalChargePayload;
+import com.backrooms.network.PortalClosingPayload;
 import com.backrooms.network.PortalOpenedPayload;
+import com.backrooms.portal.BackroomsPortals;
 import net.fabricmc.api.ModInitializer;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
@@ -41,6 +44,10 @@ public class BackroomsMod implements ModInitializer {
 		PayloadTypeRegistry.clientboundPlay().register(PortalChargePayload.TYPE, PortalChargePayload.CODEC);
 		// Portal Seamless Portals terbuka: client memicu flash, alarm, dan distorsi.
 		PayloadTypeRegistry.clientboundPlay().register(PortalOpenedPayload.TYPE, PortalOpenedPayload.CODEC);
+		// Redstone padam: portal menutup dengan animasi di client, entitasnya dihapus server setelah CLOSE_TICKS.
+		PayloadTypeRegistry.clientboundPlay().register(PortalClosingPayload.TYPE, PortalClosingPayload.CODEC);
+		ServerTickEvents.END_SERVER_TICK.register(BackroomsPortals::tick);
+		ServerEntityEvents.ENTITY_LOAD.register(BackroomsPortals::onEntityLoad);
 		ServerPlayNetworking.registerGlobalReceiver(MoodPeakPayload.TYPE, (payload, context) -> LampBlackout.trigger(context.player()));
 		ServerTickEvents.END_SERVER_TICK.register(LampBlackout::tick);
 

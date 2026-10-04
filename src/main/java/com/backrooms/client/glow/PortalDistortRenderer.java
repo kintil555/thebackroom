@@ -22,20 +22,29 @@ import net.minecraft.client.renderer.Projection;
 import net.minecraft.client.renderer.ProjectionMatrixBuffer;
 import net.minecraft.client.renderer.UniformValue;
 import net.minecraft.client.renderer.texture.DynamicTexture;
+import net.minecraft.core.Direction;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.Mth;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
 import org.joml.Vector4f;
+import qouteall.imm_ptl.core.portal.Portal;
 
 /**
- * Efek distorsi "gangguan medan magnet" pada portal yang terbuka (shader {@code portal_distort.fsh}). Berjalan selama
- * portal ada, paling kuat sesaat setelah portal muncul lalu mereda ke tingkat tetap. Seperti {@link PortalGlowRenderer},
- * parameter dinamis dikirim lewat tekstur data kecil karena uniform PostPass dibekukan saat chain dibuat.
+ * Efek layar portal Magnet (shader {@code portal_distort.fsh}), tiga fase:
+ * <ul>
+ * <li>pengisian energi: api hijau yang mengalir memutar seperti fluida di dalam bingkai (menggantikan partikel),</li>
+ * <li>portal terbuka: distorsi medan magnet melengkung yang permanen selama portal ada, paling kuat sesaat setelah
+ * muncul lalu mereda ke tingkat tetap (bukan nol),</li>
+ * <li>redstone padam: lengkungan menguat, putih kehijauan bercahaya, lalu portal mengecil ke tengah dan memudar.</li>
+ * </ul>
+ * Seperti {@link PortalGlowRenderer}, parameter dinamis dikirim lewat tekstur data kecil karena uniform PostPass
+ * dibekukan saat chain dibuat.
  */
 public final class PortalDistortRenderer {
 	private static final int MAX_SOURCES = 4;
-	private static final int DATA_WIDTH = 4;
+	private static final int DATA_WIDTH = 5;
 	private static final int ROW_GLOBAL = MAX_SOURCES;
 	private static final int DATA_HEIGHT = MAX_SOURCES + 1;
 
@@ -60,6 +69,18 @@ public final class PortalDistortRenderer {
 	private static final float FULL_DISTANCE = 14.0f;
 	private static final float FADE_DISTANCE = 14.0f;
 	private static final float VISIBILITY_RATE = 10.0f;
+	/** Kekuatan distorsi puncak saat menutup, dan titik bagi animasi penutupan (harus sama dengan CLOSE_SPLIT di shader). */
+	private static final float CLOSE_STRENGTH = 1.2f;
+	private static final float CLOSE_SPLIT = 0.40f;
+	/** Ukuran penuh ruang portal (blok), untuk mengecilkan entitas Portal di client saat menutup. */
+	private static final double PORTAL_WIDTH = HALF_WIDTH * 2.0;
+	private static final double PORTAL_HEIGHT = HALF_HEIGHT * 2.0;
+	/** Ukuran minimum agar entitas Portal tidak degenerat saat hampir hilang. */
+	private static final double MIN_PORTAL_SIZE = 0.02;
+	/** Api pengisian energi: jumlah awal, lama menyala masuk, dan lama memudar saat bloom burst mengambil alih (tick). */
+	private static final float FLAME_START = 0.3f;
+	private static final float FLAME_FADE_IN_TICKS = 30.0f;
+	private static final float FLAME_FADE_OUT_TICKS = 18.0f;
 
 	private static final Projection PROJECTION = new Projection();
 	private static final Matrix4f MATRIX = new Matrix4f();
@@ -75,7 +96,8 @@ public final class PortalDistortRenderer {
 	}
 
 	/** Satu portal yang digambar: titik tengah dan vektor ke titik setengah-lebar (R) dan setengah-tinggi (U), fraksi layar. */
-	private record Quad(float cx, float cy, float rx, float ry, float ux, float uy, float strength, int seed, float distance) {
+	private record Quad(float cx, float cy, float rx, float ry, float ux, float uy, float strength, int seed, float distance,
+		float flame, float close) {
 	}
 
 	/** Dipanggil tiap frame setelah dunia tergambar dan sebelum GUI. Tidak melakukan apa-apa jika tak ada portal terbuka. */
@@ -84,7 +106,8 @@ public final class PortalDistortRenderer {
 		ClientLevel level = minecraft.level;
 		LocalPlayer player = minecraft.player;
 		List<OpenPortals.Entry> entries = OpenPortals.entries();
-		if (level == null || player == null || failed || entries.isEmpty()) {
+		List<PortalGlowManager.Source> sources = PortalGlowManager.sources();
+		if (level == null || player == null || failed || (entries.isEmpty() && sources.isEmpty())) {
 			lastFrameNanos = 0L;
 			return;
 		}
@@ -99,13 +122,33 @@ public final class PortalDistortRenderer {
 		List<Quad> quads = new ArrayList<>(entries.size());
 		for (OpenPortals.Entry entry : entries) {
 			Vec3 center = Vec3.atCenterOf(entry.center);
+			float close = entry.closeProgress(nowTicks);
+			if (close > 0.0f) {
+				shrinkPortal(level, entry, close);
+			}
 			boolean visible = PortalSight.visible(level, eye, center);
 			entry.visibility = Mth.lerp(Math.min(1.0f, frameSeconds * VISIBILITY_RATE), entry.visibility, visible ? 1.0f : 0.0f);
 			if (entry.visibility < 0.01f) {
 				entry.visibility = 0.0f;
 				continue;
 			}
-			Quad quad = evaluate(entry, center, camera, nowTicks, main.width, main.height);
+			Quad quad = evaluate(entry, center, camera, nowTicks, close, main.width, main.height);
+			if (quad != null) {
+				quads.add(quad);
+			}
+		}
+		for (PortalGlowManager.Source source : sources) {
+			if (source.openedTick >= 0L) {
+				continue;
+			}
+			Vec3 center = Vec3.atCenterOf(source.center);
+			boolean visible = PortalSight.visible(level, eye, center);
+			source.flameVisibility = Mth.lerp(Math.min(1.0f, frameSeconds * VISIBILITY_RATE), source.flameVisibility, visible ? 1.0f : 0.0f);
+			if (source.flameVisibility < 0.01f) {
+				source.flameVisibility = 0.0f;
+				continue;
+			}
+			Quad quad = evaluateFlame(source, center, camera, nowTicks, main.width, main.height);
 			if (quad != null) {
 				quads.add(quad);
 			}
@@ -119,33 +162,72 @@ public final class PortalDistortRenderer {
 		chain.process(main, pool);
 	}
 
-	private static Quad evaluate(OpenPortals.Entry entry, Vec3 center, Camera camera, double nowTicks, int width, int height) {
+	private static Quad evaluate(OpenPortals.Entry entry, Vec3 center, Camera camera, double nowTicks, float close, int width, int height) {
 		Vec3 eye = camera.position();
 		float distance = (float) eye.distanceTo(center);
 		float range = 1.0f - PortalGlowFlicker.smooth(FADE_DISTANCE, distance - FULL_DISTANCE);
-		if (range <= 0.0f) {
+		if (range <= 0.0f || close >= 1.0f) {
 			return null;
 		}
 		float since = (float) Math.max(0.0, nowTicks - entry.openedTick);
 		float settle = PortalGlowFlicker.smooth(SETTLE_TICKS, since - PEAK_HOLD_TICKS);
-		float strength = Mth.lerp(settle, PEAK_STRENGTH, STEADY_STRENGTH)
-			* PortalGlowFlicker.smooth(FADE_IN_TICKS, since) * range * entry.visibility;
+		float base = Mth.lerp(settle, PEAK_STRENGTH, STEADY_STRENGTH) * PortalGlowFlicker.smooth(FADE_IN_TICKS, since);
+		if (close > 0.0f) {
+			base = Mth.lerp(PortalGlowFlicker.smooth(CLOSE_SPLIT, close), base, CLOSE_STRENGTH);
+		}
+		float strength = base * range * entry.visibility;
 		if (strength < 0.01f) {
 			return null;
 		}
+		return buildQuad(camera, center, entry.right, entry.center.hashCode() & 0xFF, strength, 0.0f, close, distance, width, height);
+	}
 
+	/** Api hijau pengisian energi: naik pelan sepanjang pengisian, padam singkat saat bloom burst mengambil alih. */
+	private static Quad evaluateFlame(PortalGlowManager.Source source, Vec3 center, Camera camera, double nowTicks, int width, int height) {
+		Vec3 eye = camera.position();
+		float distance = (float) eye.distanceTo(center);
+		float range = 1.0f - PortalGlowFlicker.smooth(FADE_DISTANCE, distance - FULL_DISTANCE);
+		float elapsed = (float) (nowTicks - source.startTick);
+		float progress = elapsed / source.durationTicks;
+		if (range <= 0.0f || progress < 0.0f) {
+			return null;
+		}
+		float ramp = Mth.clamp(progress / PortalGlowRenderer.BURST_START_FRACTION, 0.0f, 1.0f);
+		float fadeIn = PortalGlowFlicker.smooth(FLAME_FADE_IN_TICKS, elapsed);
+		float fadeOut = 1.0f - PortalGlowFlicker.smooth(FLAME_FADE_OUT_TICKS, (progress - PortalGlowRenderer.BURST_START_FRACTION) * source.durationTicks);
+		float flame = Mth.lerp(ramp * ramp, FLAME_START, 1.0f) * fadeIn * fadeOut * range * source.flameVisibility;
+		if (flame < 0.01f) {
+			return null;
+		}
+		return buildQuad(camera, center, source.right, source.center.hashCode() & 0xFF, 0.0f, flame, 0.0f, distance, width, height);
+	}
+
+	private static Quad buildQuad(Camera camera, Vec3 center, Direction rightDir, int seed, float strength, float flame,
+		float close, float distance, int width, int height) {
 		float[] c = project(camera, center, width, height);
 		if (c == null) {
 			return null;
 		}
-		Vec3 right = Vec3.atLowerCornerOf(entry.right.getUnitVec3i());
+		Vec3 right = Vec3.atLowerCornerOf(rightDir.getUnitVec3i());
 		float[] r = projectAxis(camera, center, right.scale(HALF_WIDTH), c, width, height);
 		float[] u = projectAxis(camera, center, new Vec3(0.0, HALF_HEIGHT, 0.0), c, width, height);
 		if (r == null || u == null) {
 			return null;
 		}
-		int seed = entry.center.hashCode() & 0xFF;
-		return new Quad(c[0] / width, c[1] / height, r[0] / width, r[1] / height, u[0] / width, u[1] / height, strength, seed, distance);
+		return new Quad(c[0] / width, c[1] / height, r[0] / width, r[1] / height, u[0] / width, u[1] / height, strength, seed, distance, flame, close);
+	}
+
+	/**
+	 * Mengecilkan entitas Portal di client selama animasi menutup: ukuran penuh sampai {@link #CLOSE_SPLIT}, lalu menyusut
+	 * ke tengah (rumus sama dengan {@code closeGlow} di shader). Server menghapus entitasnya setelah animasi selesai.
+	 */
+	private static void shrinkPortal(ClientLevel level, OpenPortals.Entry entry, float close) {
+		float e = Mth.clamp((close - CLOSE_SPLIT) / (1.0f - CLOSE_SPLIT), 0.0f, 1.0f);
+		double scale = 1.0 - e * e;
+		for (Portal portal : level.getEntitiesOfClass(Portal.class, new AABB(entry.center).inflate(0.5))) {
+			portal.setWidth(Math.max(MIN_PORTAL_SIZE, PORTAL_WIDTH * scale));
+			portal.setHeight(Math.max(MIN_PORTAL_SIZE, PORTAL_HEIGHT * scale));
+		}
 	}
 
 	/** Vektor layar (piksel) dari {@code c} ke titik {@code center + offset}; offset dikecilkan bila titiknya di belakang kamera. */
@@ -188,10 +270,13 @@ public final class PortalDistortRenderer {
 			int ux = encode16((q.ux() + 2.0f) / 4.0f);
 			int uy = encode16((q.uy() + 2.0f) / 4.0f);
 			int strength = encode16(q.strength());
+			int close = encode16(q.close());
+			int flame = encode16(q.flame());
 			image.setPixelABGR(0, row, abgr(cx >> 8, cx & 0xFF, cy >> 8, cy & 0xFF));
 			image.setPixelABGR(1, row, abgr(rx >> 8, rx & 0xFF, ry >> 8, ry & 0xFF));
 			image.setPixelABGR(2, row, abgr(ux >> 8, ux & 0xFF, uy >> 8, uy & 0xFF));
 			image.setPixelABGR(3, row, abgr(strength >> 8, strength & 0xFF, q.seed(), 255));
+			image.setPixelABGR(4, row, abgr(close >> 8, close & 0xFF, flame >> 8, flame & 0xFF));
 		}
 		int time = encode16(seconds / 64.0f);
 		image.setPixelABGR(0, ROW_GLOBAL, abgr(time >> 8, time & 0xFF, 0, 255));

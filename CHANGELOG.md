@@ -39,3 +39,6 @@
 - Portal Magnet kini memakai portal Seamless Portals (Immersive Portals) menggantikan blok Nether Portal placeholder. Portal 3x5 dua sisi dengan pasangan di tujuan (sementara Overworld <-> Nether 1:8, ruang tiba dibuat bila perlu); menghancurkan Magnet bingkai menutup portal. Butuh mod Seamless Portals
 - Efek pengisian energi: api/aura hijau mengalir di tepi dalam bingkai sebelum burst listrik (partikel `energy_flame`)
 - Efek portal terbuka: shader distorsi "gangguan medan magnet" (`portal_distort.fsh`) pada area portal, kuat saat muncul lalu mereda
+- Portal Magnet: api pengisian energi kini post-FX shader (`portal_distort.fsh`), aliran hijau berputar seperti fluida di dalam bingkai; partikel api lama dihapus
+- Portal Magnet: distorsi melengkung kini permanen selama portal terbuka; portal yang sudah terbuka dikenali client lewat pemindaian entitas (pemain baru masuk/mendekat tetap melihat efeknya)
+- Portal Magnet: redstone padam menutup portal. Animasi 2 detik: lengkungan menguat, putih kehijauan bercahaya, lalu portal mengecil ke tengah dan memudar; portal dikunci (tidak bisa dilewati) selama animasi. Daya yang hanya pulsa menutup portal 1 detik setelah terbuka
