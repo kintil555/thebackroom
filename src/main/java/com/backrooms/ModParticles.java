@@ -14,11 +14,16 @@ public final class ModParticles {
 	public static final SimpleParticleType ELECTRIC_SPARK_BURST = new SimpleParticleType(false) {
 	};
 
+	/** Api/aura hijau yang mengalir di tepi bingkai portal selama mengisi energi (sebelum burst). */
+	public static final SimpleParticleType ENERGY_FLAME = new SimpleParticleType(false) {
+	};
+
 	private ModParticles() {
 	}
 
 	public static void init() {
 		Registry.register(BuiltInRegistries.PARTICLE_TYPE, Identifier.fromNamespaceAndPath(BackroomsMod.MOD_ID, "electric_spark"), ELECTRIC_SPARK);
 		Registry.register(BuiltInRegistries.PARTICLE_TYPE, Identifier.fromNamespaceAndPath(BackroomsMod.MOD_ID, "electric_spark_burst"), ELECTRIC_SPARK_BURST);
+		Registry.register(BuiltInRegistries.PARTICLE_TYPE, Identifier.fromNamespaceAndPath(BackroomsMod.MOD_ID, "energy_flame"), ENERGY_FLAME);
 	}
 }

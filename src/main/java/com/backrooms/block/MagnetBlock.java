@@ -1,6 +1,7 @@
 package com.backrooms.block;
 
 import com.backrooms.network.PortalChargePayload;
+import com.backrooms.portal.BackroomsPortals;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -90,6 +91,10 @@ public class MagnetBlock extends Block {
 			reportDebug(serverLevel, pos, frame);
 			return;
 		}
+		if (BackroomsPortals.isOpen(serverLevel, frame.center())) {
+			// Portal sudah terbuka di bingkai ini: tidak mengisi energi lagi.
+			return;
+		}
 		// Semua Magnet bingkai ditandai ACTIVE. Magnet pertama (pemimpin) menyalakan sirine setelah SIREN_DELAY_TICKS,
 		// lalu menyelesaikan sisa hitung mundur; Magnet lain langsung dijadwalkan selesai (tahan jika salah satu rusak).
 		for (BlockPos magnetPos : frame.magnets()) {
@@ -150,6 +155,12 @@ public class MagnetBlock extends Block {
 		if (frame != null) {
 			frame.openPortal(level);
 		}
+	}
+
+	@Override
+	protected void affectNeighborsAfterRemoval(BlockState state, ServerLevel level, BlockPos pos, boolean movedByPiston) {
+		BackroomsPortals.closeNear(level, pos);
+		super.affectNeighborsAfterRemoval(state, level, pos, movedByPiston);
 	}
 
 	/** Efek mengumpulkan energi: partikel portal di sekitar Magnet selama hitung mundur. */

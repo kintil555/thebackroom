@@ -126,7 +126,7 @@ final class PortalSparks {
 	}
 
 	/** Basis portal: pusat ruang, sumbu lebar (right) dan sumbu normal (horizontal tegak lurus). */
-	private static final class Frame {
+	static final class Frame {
 		final double cx;
 		final double cy;
 		final double cz;

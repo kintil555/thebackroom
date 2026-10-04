@@ -1,15 +1,13 @@
 package com.backrooms.block;
 
-import com.backrooms.ModBlocks;
+import com.backrooms.portal.BackroomsPortals;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.NetherPortalBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import org.jspecify.annotations.Nullable;
 
@@ -167,13 +165,8 @@ public record MagnetFrame(BlockPos base, Direction right, List<BlockPos> magnets
 		return false;
 	}
 
-	/** Placeholder: mengisi ruang 3x5 dengan Nether Portal. TODO: ganti ke portal dimensi Backrooms. */
+	/** Membuka portal Seamless Portals 3x5 di ruang bingkai; aman dipanggil berulang (tidak membuat portal ganda). */
 	public void openPortal(ServerLevel level) {
-		BlockState portal = ModBlocks.PLACEHOLDER_PORTAL.defaultBlockState().setValue(NetherPortalBlock.AXIS, this.right.getAxis());
-		for (int a = 0; a < WIDTH; a++) {
-			for (int h = 0; h < HEIGHT; h++) {
-				level.setBlock(at(this.base, this.right, a, h), portal, Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);
-			}
-		}
+		BackroomsPortals.open(level, this);
 	}
 }

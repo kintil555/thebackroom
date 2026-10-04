@@ -1,9 +1,9 @@
 package com.backrooms.client.glow;
 
-import com.backrooms.ModBlocks;
 import com.backrooms.block.MagnetFrame;
 import com.backrooms.client.light.ColoredLights;
 import com.backrooms.network.PortalChargePayload;
+import com.backrooms.network.PortalOpenedPayload;
 import net.minecraft.core.Direction;
 import net.minecraft.util.Mth;
 import java.util.ArrayList;
@@ -63,6 +63,8 @@ public final class PortalGlowManager {
 		final PortalChargeSounds sounds;
 		/** Keterlihatan hasil smoothing 0..1: turun saat tengah portal terhalang blok dari kamera. */
 		float visibility;
+		/** Fase putaran aliran api hijau di tepi bingkai (lap, bertambah tiap tick); lihat {@link PortalFlames}. */
+		float flamePhase;
 
 		Source(BlockPos leader, BlockPos center, long startTick, int durationTicks, Direction right) {
 			this.right = right;
@@ -136,6 +138,8 @@ public final class PortalGlowManager {
 	public static void init() {
 		ClientPlayNetworking.registerGlobalReceiver(PortalChargePayload.TYPE,
 			(payload, context) -> onCharge(payload, context.client().level));
+		ClientPlayNetworking.registerGlobalReceiver(PortalOpenedPayload.TYPE,
+			(payload, context) -> OpenPortals.onOpened(payload, context.client().level));
 		ClientTickEvents.END_CLIENT_TICK.register(client -> tick(client.level));
 	}
 
@@ -165,6 +169,7 @@ public final class PortalGlowManager {
 	}
 
 	private static void tick(@Nullable ClientLevel level) {
+		OpenPortals.tick(level);
 		PortalAlarm.tick(level);
 		if (level == null) {
 			SOURCES.forEach(source -> source.sounds.stop());
@@ -176,7 +181,7 @@ public final class PortalGlowManager {
 		Iterator<Source> iterator = SOURCES.iterator();
 		while (iterator.hasNext()) {
 			Source source = iterator.next();
-			if (source.openedTick < 0L && level.getBlockState(source.center).is(ModBlocks.PLACEHOLDER_PORTAL)) {
+			if (source.openedTick < 0L && OpenPortals.isOpen(source.center)) {
 				source.openedTick = now;
 				PortalAlarm.start(level, source.center, now);
 				LocalPlayer player = Minecraft.getInstance().player;
@@ -186,6 +191,7 @@ public final class PortalGlowManager {
 			}
 			source.sounds.tick(now - source.startTick, source.openedTick < 0L ? -1L : now - source.openedTick);
 			PortalSparks.tick(level, source, now);
+			PortalFlames.tick(level, source, now);
 			boolean opened = source.openedTick >= 0L;
 			boolean charging = !opened && now - source.startTick < source.durationTicks;
 			boolean finished = opened && now - source.openedTick >= AFTER_OPEN_TICKS;

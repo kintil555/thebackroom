@@ -22,6 +22,8 @@ dependencies {
     implementation 'net.fabricmc.fabric-api:fabric-api:0.157.0+26.2'
     // API LambDynamicLights hanya untuk kompilasi; mod ini tetap jalan tanpa LambDynamicLights terpasang.
     compileOnly 'dev.lambdaurora.lambdynamiclights:lambdynamiclights-api:4.12.4+26.2'
+    // Seamless Portals (fork Immersive Portals) untuk portal Magnet; cloth-config sudah jar-in-jar di dalamnya.
+    implementation files('libs/seamlessportals-fabric-1_0_0.jar')
 }
 
 java {

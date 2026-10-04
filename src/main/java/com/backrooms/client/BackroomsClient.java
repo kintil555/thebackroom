@@ -5,6 +5,7 @@ import com.backrooms.ModBlocks;
 import com.backrooms.client.glow.PortalGlowManager;
 import com.backrooms.ModParticles;
 import com.backrooms.client.particle.ElectricSparkParticle;
+import com.backrooms.client.particle.EnergyFlameParticle;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.particle.v1.ParticleProviderRegistry;
 import net.fabricmc.fabric.api.client.model.loading.v1.ModelLoadingPlugin;
@@ -19,6 +20,7 @@ public class BackroomsClient implements ClientModInitializer {
 		PortalGlowManager.init();
 		ParticleProviderRegistry.getInstance().register(ModParticles.ELECTRIC_SPARK, sprites -> new ElectricSparkParticle.Provider(sprites, false));
 		ParticleProviderRegistry.getInstance().register(ModParticles.ELECTRIC_SPARK_BURST, sprites -> new ElectricSparkParticle.Provider(sprites, true));
+		ParticleProviderRegistry.getInstance().register(ModParticles.ENERGY_FLAME, EnergyFlameParticle.Provider::new);
 		BlockEntityRenderers.register(ModBlockEntities.SIREN, SirenRenderer::new);
 
 		// Bungkus model semua blok biasa agar carpet (attachment chunk) ikut tergambar. Screw Piles menggambar

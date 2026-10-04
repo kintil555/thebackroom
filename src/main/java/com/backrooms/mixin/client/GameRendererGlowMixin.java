@@ -1,5 +1,6 @@
 package com.backrooms.mixin.client;
 
+import com.backrooms.client.glow.PortalDistortRenderer;
 import com.backrooms.client.glow.PortalGlowRenderer;
 import com.backrooms.client.light.ColoredLightRenderer;
 import com.backrooms.client.light.LampBloomRenderer;
@@ -34,5 +35,7 @@ public abstract class GameRendererGlowMixin {
 		ColoredLightRenderer.render(this.mainRenderTarget, this.resourcePool, deltaTracker);
 		LampBloomRenderer.render(this.mainRenderTarget, this.resourcePool, deltaTracker);
 		PortalGlowRenderer.render(this.mainRenderTarget, this.resourcePool, deltaTracker);
+		// Distorsi medan magnet pada portal yang terbuka, di atas bloom.
+		PortalDistortRenderer.render(this.mainRenderTarget, this.resourcePool, deltaTracker);
 	}
 }

@@ -1,6 +1,5 @@
 package com.backrooms.client.glow;
 
-import com.backrooms.ModBlocks;
 import com.backrooms.ModSounds;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -17,7 +16,7 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * Alarm portal: setelah portal terbuka, {@code portal_alarm} diputar sampai habis, jeda {@link #GAP_SECONDS} detik,
- * lalu diputar lagi, terus berulang selama blok portal masih ada di posisinya. Berdiri sendiri (tidak bergantung pada
+ * lalu diputar lagi, terus berulang selama portal masih terbuka (lihat {@link OpenPortals}). Berdiri sendiri (tidak bergantung pada
  * {@code PortalGlowManager.Source}, yang dibuang beberapa detik setelah portal terbuka).
  */
 final class PortalAlarm {
@@ -70,7 +69,7 @@ final class PortalAlarm {
 		while (iterator.hasNext()) {
 			Map.Entry<BlockPos, Alarm> entry = iterator.next();
 			Alarm alarm = entry.getValue();
-			if (!level.getBlockState(entry.getKey()).is(ModBlocks.PLACEHOLDER_PORTAL)) {
+			if (!OpenPortals.isOpen(entry.getKey())) {
 				if (alarm.current != null) {
 					soundManager.stop(alarm.current);
 				}
