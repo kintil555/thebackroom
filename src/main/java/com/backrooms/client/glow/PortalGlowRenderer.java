@@ -23,6 +23,7 @@ import net.minecraft.client.renderer.Projection;
 import net.minecraft.client.renderer.ProjectionMatrixBuffer;
 import net.minecraft.client.renderer.UniformValue;
 import net.minecraft.client.renderer.texture.DynamicTexture;
+import net.minecraft.core.Direction;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.Mth;
 import net.minecraft.world.phys.Vec3;
@@ -45,8 +46,10 @@ public final class PortalGlowRenderer {
 	private static final int ROW_CAMERA = MAX_SOURCES;
 	private static final int ROW_FLASH = MAX_SOURCES + 1;
 	/** Oklusi depth per piksel (API DepthOcclusion); baris pertamanya harus sama dengan OCCLUSION_ROW di portal_glow.fsh. */
-	private static final DepthOcclusion OCCLUSION = DepthOcclusion.at(MAX_SOURCES + 2).range(1.0f, 2.5f);
-	private static final float[] SOURCE_DISTANCES = new float[MAX_SOURCES];
+	private static final DepthOcclusion OCCLUSION = DepthOcclusion.at(MAX_SOURCES + 2, MAX_SOURCES).range(0.3f, 0.6f).planeThickness(0.6f);
+	/** Radius bidang portal (setengah tinggi 2,5 + margin) untuk oklusi: di dalamnya hanya permukaan di depan bidang portal (melebihi ketebalan bingkai) yang memotong glow. */
+	private static final float PORTAL_PLANE_RADIUS_BLOCKS = 2.6f;
+	private static final List<DepthOcclusion.Source> OCCLUDERS = new ArrayList<>(MAX_SOURCES);
 	private static final int DATA_HEIGHT = OCCLUSION.endRow();
 
 	/** Tempat tekstur data didaftarkan. PostChain me-resolve input tekstur ke {@code textures/effect/<path>.png}. */
@@ -112,7 +115,7 @@ public final class PortalGlowRenderer {
 	}
 
 	/** Posisi layar ternormalisasi (asal kiri-atas), radius sebagai fraksi tinggi layar, dan intensitas akhir. */
-	private record Glow(float x, float y, float radius, float intensity, float spread, float distance) {
+	private record Glow(float x, float y, float radius, float intensity, float spread, DepthOcclusion.Source occluder) {
 	}
 
 	/** Dipanggil tiap frame setelah dunia tergambar dan sebelum GUI. Tidak melakukan apa-apa jika tak ada sumber. */
@@ -211,7 +214,7 @@ public final class PortalGlowRenderer {
 		float intensity = envelope * flicker * fadeIn * near;
 
 		return new Glow(projected[0] / width, projected[1] / height, Math.min(2.0f, projected[2] / height), intensity, spread,
-			(float) Math.sqrt(distanceSq));
+			DepthOcclusion.Source.plane(target, portalNormal(source), PORTAL_PLANE_RADIUS_BLOCKS));
 	}
 
 	/**
@@ -369,13 +372,18 @@ public final class PortalGlowRenderer {
 		dataTexture.upload();
 	}
 
-	/** Jarak tiap sumber + invers matriks kamera ke tekstur data lewat API DepthOcclusion. */
+	/** Normal bidang portal: sumbu horizontal yang tegak lurus sumbu lebar bingkai. */
+	private static Vec3 portalNormal(PortalGlowManager.Source source) {
+		return source.right.getAxis() == Direction.Axis.X ? new Vec3(0.0, 0.0, 1.0) : new Vec3(1.0, 0.0, 0.0);
+	}
+
+	/** Data oklusi (matriks kamera, rentang, bidang tiap sumber) ke tekstur data lewat API DepthOcclusion. */
 	private static void writeDepthRows(NativeImage image, Camera camera, List<Glow> glows) {
-		int count = Math.min(MAX_SOURCES, glows.size());
-		for (int i = 0; i < count; i++) {
-			SOURCE_DISTANCES[i] = glows.get(i).distance();
+		OCCLUDERS.clear();
+		for (int i = 0; i < glows.size() && i < MAX_SOURCES; i++) {
+			OCCLUDERS.add(glows.get(i).occluder());
 		}
-		OCCLUSION.write(image, camera, SOURCE_DISTANCES, count);
+		OCCLUSION.write(image, camera, OCCLUDERS);
 	}
 
 	private static int encode16(float value) {

@@ -1,13 +1,17 @@
-// API oklusi depth buffer per piksel untuk post effect sumber titik. Pasangan Java: DepthOcclusion.
+// API oklusi depth buffer per piksel untuk post effect berbasis sumber. Pasangan Java: DepthOcclusion (tata letak data ada di sana).
 // Pakai: #moj_import <backrooms:depth_occlusion.glsl>
 //   float open = depthOcclusionOpenness(DepthSampler, DepthSize, DataSampler, FIRST_ROW, sourceIndex, texCoord);
 // 0 = sumber tertutup penuh di piksel ini, 1 = terlihat penuh. Kalikan kontribusi sumber dengan nilai ini.
-// DepthSampler = depth buffer main (TargetInput use_depth_buffer), DataSampler = tekstur data efek (tata letak di DepthOcclusion.java).
+// DepthSampler = depth buffer main (TargetInput use_depth_buffer), DataSampler = tekstur data efek.
 
 float depOccFetchFloat(sampler2D dataTex, int x, int y) {
     vec4 c = texelFetch(dataTex, ivec2(x, y), 0);
     uvec4 b = uvec4(c * 255.0 + 0.5);
     return uintBitsToFloat(b.r | (b.g << 8u) | (b.b << 16u) | (b.a << 24u));
+}
+
+vec3 depOccFetchVec3(sampler2D dataTex, int x, int y) {
+    return vec3(depOccFetchFloat(dataTex, x, y), depOccFetchFloat(dataTex, x + 1, y), depOccFetchFloat(dataTex, x + 2, y));
 }
 
 mat4 depOccFetchMatrix(sampler2D dataTex, int row) {
@@ -18,36 +22,64 @@ mat4 depOccFetchMatrix(sampler2D dataTex, int row) {
         depOccFetchFloat(dataTex, 12, row), depOccFetchFloat(dataTex, 13, row), depOccFetchFloat(dataTex, 14, row), depOccFetchFloat(dataTex, 15, row));
 }
 
-// Jarak kamera ke permukaan terlihat pada koordinat layar uv (langit = sangat jauh).
-float depOccSceneDistance(sampler2D depthTex, vec2 depthSize, mat4 inverseMatrix, bool zeroToOne, vec2 uv) {
+// 1 = piksel ini tidak tertutup (sumber terlihat), 0 = permukaan di piksel ini menutupi sumber. Ukuran/kecerahan efek tidak berubah.
+float depOccOpenAt(sampler2D depthTex, vec2 depthSize, mat4 inverseMatrix, bool zeroToOne, float nearD, float farD, float planeThickness,
+                   vec3 center, vec3 normal, float radius, vec2 uv) {
     vec2 clamped = clamp(uv, vec2(0.0), vec2(0.9999));
     float depth = texelFetch(depthTex, ivec2(clamped * depthSize), 0).r;
     if (depth >= 0.99999) {
-        return 1.0e6;
+        return 1.0; // langit: tidak ada yang menutupi
     }
     vec2 ndc = clamped * 2.0 - 1.0;
     float ndcZ = zeroToOne ? depth : depth * 2.0 - 1.0;
     vec4 world = inverseMatrix * vec4(ndc, ndcZ, 1.0);
-    return abs(world.w) > 1.0e-8 ? length(world.xyz / world.w) : 1.0e6;
-}
+    if (abs(world.w) <= 1.0e-8) {
+        return 1.0;
+    }
+    vec3 surface = world.xyz / world.w; // permukaan terlihat, relatif kamera
 
-float depOccOpenAt(sampler2D depthTex, vec2 depthSize, mat4 inverseMatrix, bool zeroToOne, float nearD, float farD, float sourceDistance, vec2 uv) {
-    return smoothstep(sourceDistance - farD, sourceDistance - nearD, depOccSceneDistance(depthTex, depthSize, inverseMatrix, zeroToOne, uv));
+    // Aturan titik: permukaan lebih dekat ke kamera daripada sumber = menutupi.
+    float centerDistance = length(center);
+    float openPoint = smoothstep(centerDistance - farD, centerDistance - nearD, length(surface));
+    if (radius <= 0.0) {
+        return openPoint;
+    }
+
+    // Aturan bidang: sinar piksel menembus bidang di dalam radius -> yang menutupi hanya permukaan di depan bidang (melebihi ketebalan).
+    vec3 rayDir = normalize(surface);
+    float facing = dot(normal, rayDir);
+    if (abs(facing) < 1.0e-3) {
+        return openPoint;
+    }
+    float t = dot(normal, center) / facing;
+    if (t <= 0.0) {
+        return openPoint;
+    }
+    float inPlane = length(rayDir * t - center);
+    float planeWeight = 1.0 - smoothstep(radius, radius + 0.5, inPlane);
+    float side = dot(normal, center) > 0.0 ? -1.0 : 1.0; // sisi kamera = positif
+    float height = dot(surface - center, normal) * side;
+    float openPlane = 1.0 - smoothstep(planeThickness, planeThickness + (farD - nearD), height);
+    return mix(openPoint, openPlane, planeWeight);
 }
 
 // 5 sampel (tengah berbobot 2) menghaluskan tepi siluet blok.
 float depthOcclusionOpenness(sampler2D depthTex, vec2 depthSize, sampler2D dataTex, int firstRow, int sourceIndex, vec2 uv) {
     mat4 inverseMatrix = depOccFetchMatrix(dataTex, firstRow);
-    int row = firstRow + 1;
-    bool zeroToOne = depOccFetchFloat(dataTex, 0, row) > 0.5;
-    float nearD = depOccFetchFloat(dataTex, 1, row);
-    float farD = depOccFetchFloat(dataTex, 2, row);
-    float sourceDistance = depOccFetchFloat(dataTex, 3 + sourceIndex, row);
+    int header = firstRow + 1;
+    bool zeroToOne = depOccFetchFloat(dataTex, 0, header) > 0.5;
+    float nearD = depOccFetchFloat(dataTex, 1, header);
+    float farD = depOccFetchFloat(dataTex, 2, header);
+    float planeThickness = depOccFetchFloat(dataTex, 3, header);
+    int row = firstRow + 2 + sourceIndex;
+    vec3 center = depOccFetchVec3(dataTex, 0, row);
+    vec3 normal = depOccFetchVec3(dataTex, 3, row);
+    float radius = depOccFetchFloat(dataTex, 6, row);
     vec2 texel = 1.5 / depthSize;
-    float sum = 2.0 * depOccOpenAt(depthTex, depthSize, inverseMatrix, zeroToOne, nearD, farD, sourceDistance, uv);
-    sum += depOccOpenAt(depthTex, depthSize, inverseMatrix, zeroToOne, nearD, farD, sourceDistance, uv + vec2(texel.x, 0.0));
-    sum += depOccOpenAt(depthTex, depthSize, inverseMatrix, zeroToOne, nearD, farD, sourceDistance, uv - vec2(texel.x, 0.0));
-    sum += depOccOpenAt(depthTex, depthSize, inverseMatrix, zeroToOne, nearD, farD, sourceDistance, uv + vec2(0.0, texel.y));
-    sum += depOccOpenAt(depthTex, depthSize, inverseMatrix, zeroToOne, nearD, farD, sourceDistance, uv - vec2(0.0, texel.y));
+    float sum = 2.0 * depOccOpenAt(depthTex, depthSize, inverseMatrix, zeroToOne, nearD, farD, planeThickness, center, normal, radius, uv);
+    sum += depOccOpenAt(depthTex, depthSize, inverseMatrix, zeroToOne, nearD, farD, planeThickness, center, normal, radius, uv + vec2(texel.x, 0.0));
+    sum += depOccOpenAt(depthTex, depthSize, inverseMatrix, zeroToOne, nearD, farD, planeThickness, center, normal, radius, uv - vec2(texel.x, 0.0));
+    sum += depOccOpenAt(depthTex, depthSize, inverseMatrix, zeroToOne, nearD, farD, planeThickness, center, normal, radius, uv + vec2(0.0, texel.y));
+    sum += depOccOpenAt(depthTex, depthSize, inverseMatrix, zeroToOne, nearD, farD, planeThickness, center, normal, radius, uv - vec2(0.0, texel.y));
     return sum / 6.0;
 }

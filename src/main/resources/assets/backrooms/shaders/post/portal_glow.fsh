@@ -1,7 +1,7 @@
 #version 330
 
 // Bloom/glow di tengah portal yang sedang mengisi energi. Posisi, radius, intensitas, dan warna datang dari
-// DataSampler (tekstur 16x8, ditulis ulang tiap frame oleh PortalGlowRenderer), sehingga satu chain statis cukup
+// DataSampler (tekstur 16x12, ditulis ulang tiap frame oleh PortalGlowRenderer), sehingga satu chain statis cukup
 // dan tidak perlu dibangun ulang saat kamera bergerak atau intensitas berkedip.
 //
 // Satu baris = satu sumber (maksimal 4), 8 bit per kanal:
@@ -15,7 +15,7 @@
 //   texel 1: r,g = fase waktu 0..1 (16 bit, satu putaran = 4 detik)
 //   texel 2: r,g = exposure/gelap 0..1 (16 bit)
 // Baris ke-5 (index 5), texel 2: r = jejak frame sebelumnya 0..1 (flashbang: 0 = tanpa jejak, mendekati 1 = frame lama bertahan lama).
-// Baris ke-6 dan ke-7 = blok oklusi depth (API DepthOcclusion: invers matriks kamera + jarak tiap sumber).
+// Baris ke-6 dst (6 baris) = blok oklusi depth (API DepthOcclusion: invers matriks kamera, rentang, pusat + bidang tiap sumber).
 // HistSampler = hasil frame sebelumnya (target persisten), sebelum overlay flashbang (lihat portal_flash.fsh).
 // DepthSampler = depth buffer main. Oklusi per piksel: glow hanya digambar di piksel yang permukaan terlihatnya tidak jauh lebih
 // dekat ke kamera daripada sumber, jadi glow yang tertutup blok setengahnya tetap muncul utuh di bagian yang tidak tertutup.
