@@ -4,7 +4,7 @@
 //   1. api energi hijau yang mengalir memutar seperti fluida selama pengisian energi (flame),
 //   2. distorsi medan magnet melengkung yang permanen selama portal terbuka (strength),
 //   3. animasi menutup: lengkungan menguat, putih kehijauan bercahaya, lalu mengecil ke tengah dan memudar (close).
-// Parameter datang dari DataSampler (tekstur 5x5, ditulis ulang tiap frame oleh PortalDistortRenderer), 8 bit per kanal,
+// Parameter datang dari DataSampler (tekstur 16 x 11 (blok oklusi depth ikut di baris 5 dst), ditulis ulang tiap frame oleh PortalDistortRenderer), 8 bit per kanal,
 // nilai 16 bit disusun dari dua kanal (hi, lo). Baris 0..3 = satu portal per baris (maksimal 4):
 //   texel 0: r,g = x tengah   b,a = y tengah        layar ternormalisasi, asal kiri-atas, disimpan (nilai + 0.5) / 2
 //   texel 1: r,g = x   b,a = y   vektor dari tengah ke titik setengah-lebar portal (R), disimpan (nilai + 2) / 4
@@ -14,14 +14,20 @@
 // Baris 4, texel 0: r,g = waktu (detik mod 64) / 64.
 // Koordinat lokal (a, b) di bidang portal: tengah = (0,0), tepi portal pada |a| = 1 dan |b| = 1. Efek dibatasi pada
 // kotak portal ditambah halo lembut di sekelilingnya, sehingga ruangan di luar portal tidak ikut terdistorsi.
+// Oklusi per piksel: api, cahaya penutupan, dan distorsi hanya digambar di piksel yang tidak tertutup benda di depan bidang portal
+// (API DepthOcclusion). Urutan SamplerInfo mengikuti urutan input chain: In, Data, Depth.
 uniform sampler2D InSampler;
 uniform sampler2D DataSampler;
+uniform sampler2D DepthSampler;
 
 layout(std140) uniform SamplerInfo {
     vec2 OutSize;
     vec2 InSize;
     vec2 DataSize;
+    vec2 DepthSize;
 };
+
+#moj_import <backrooms:depth_occlusion.glsl>
 
 in vec2 texCoord;
 
@@ -29,6 +35,8 @@ out vec4 fragColor;
 
 const int MAX_SOURCES = 4;
 const int ROW_GLOBAL = 4;
+// Baris pertama blok oklusi depth (lihat DepthOcclusion.java); harus sama dengan DepthOcclusion.at(...) di PortalDistortRenderer.
+const int OCCLUSION_ROW = MAX_SOURCES + 1;
 // Setelan distorsi. Ubah angka ini untuk menyetel kekuatannya (px pada layar tinggi 1080).
 const float WOBBLE_PX = 7.0;      // goyangan bergelombang
 const float RING_PX = 6.0;        // riak cincin medan yang bergerak keluar dari tengah
@@ -160,13 +168,24 @@ void main() {
         vec2 d = pix - center;
         vec2 local = vec2(d.x * axisU.y - d.y * axisU.x, axisR.x * d.y - axisR.y * d.x) / det;
 
+        // Jauh di luar kotak portal dan tidak sedang menutup: tidak ada kontribusi, lewati sebelum membaca depth.
+        float box = max(abs(local.x), abs(local.y));
+        if (box > 1.7 && close <= 0.001) {
+            continue;
+        }
+        // Piksel yang permukaan terlihatnya menutupi bidang portal tidak ikut efek (tengah tertutup tidak mematikan sisanya).
+        float open = depthOcclusionOpenness(DepthSampler, DepthSize, DataSampler, OCCLUSION_ROW, i, texCoord);
+        if (open <= 0.001) {
+            continue;
+        }
+
         // Api pengisian energi (portal belum ada, hanya bingkai).
-        if (flameAmount > 0.003 && max(abs(local.x), abs(local.y)) < 1.2) {
-            glow += flame(local, time, seed, flameAmount);
+        if (flameAmount > 0.003 && box < 1.2) {
+            glow += flame(local, time, seed, flameAmount) * open;
         }
         // Cahaya penutupan.
         if (close > 0.001) {
-            glow += closeGlow(local, close);
+            glow += closeGlow(local, close) * open;
         }
         if (strength < 0.003) {
             continue;
@@ -183,6 +202,7 @@ void main() {
         if (mask <= 0.001) {
             continue;
         }
+        mask *= open;
         float amount = mask * strength;
 
         float radius = length(ld);

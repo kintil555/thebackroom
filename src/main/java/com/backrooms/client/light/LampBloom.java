@@ -1,5 +1,6 @@
 package com.backrooms.client.light;
 
+import com.backrooms.client.postfx.LevelMatrices;
 import com.backrooms.BackroomsMod;
 import com.backrooms.ModBlocks;
 import com.backrooms.block.LampBlock;
@@ -96,7 +97,7 @@ final class LampBloom {
 		if (CANDIDATES.isEmpty()) {
 			return List.of();
 		}
-		camera.getViewRotationProjectionMatrix(MATRIX);
+		LevelMatrices.viewProjection(camera, MATRIX);
 		List<Lamp> lamps = new ArrayList<>();
 		for (BlockPos pos : CANDIDATES) {
 			BlockState state = level.getBlockState(pos);

@@ -1,6 +1,8 @@
 package com.backrooms.client.glow;
 
+import com.backrooms.client.postfx.LevelMatrices;
 import com.backrooms.BackroomsMod;
+import com.backrooms.client.postfx.DepthOcclusion;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.resource.CrossFrameResourcePool;
@@ -44,9 +46,13 @@ import qouteall.imm_ptl.core.portal.Portal;
  */
 public final class PortalDistortRenderer {
 	private static final int MAX_SOURCES = 4;
-	private static final int DATA_WIDTH = 5;
+	private static final int DATA_WIDTH = DepthOcclusion.WIDTH;
 	private static final int ROW_GLOBAL = MAX_SOURCES;
-	private static final int DATA_HEIGHT = MAX_SOURCES + 1;
+	/** Oklusi depth per piksel (API DepthOcclusion); baris pertamanya harus sama dengan OCCLUSION_ROW di portal_distort.fsh. */
+	private static final DepthOcclusion OCCLUSION = DepthOcclusion.at(MAX_SOURCES + 1, MAX_SOURCES).range(0.3f, 0.6f).planeThickness(0.6f);
+	private static final int DATA_HEIGHT = OCCLUSION.endRow();
+	private static final float PLANE_RADIUS_BLOCKS = 3.1f;
+	private static final List<DepthOcclusion.Source> OCCLUDERS = new ArrayList<>(MAX_SOURCES);
 
 	private static final Identifier DATA_TEXTURE_ID = Identifier.fromNamespaceAndPath(BackroomsMod.MOD_ID, "textures/effect/portal_distort_data.png");
 	private static final Identifier DATA_INPUT_ID = Identifier.fromNamespaceAndPath(BackroomsMod.MOD_ID, "portal_distort_data");
@@ -97,7 +103,7 @@ public final class PortalDistortRenderer {
 
 	/** Satu portal yang digambar: titik tengah dan vektor ke titik setengah-lebar (R) dan setengah-tinggi (U), fraksi layar. */
 	private record Quad(float cx, float cy, float rx, float ry, float ux, float uy, float strength, int seed, float distance,
-		float flame, float close) {
+		float flame, float close, DepthOcclusion.Source occluder) {
 	}
 
 	/** Dipanggil tiap frame setelah dunia tergambar dan sebelum GUI. Tidak melakukan apa-apa jika tak ada portal terbuka. */
@@ -126,8 +132,8 @@ public final class PortalDistortRenderer {
 			if (close > 0.0f) {
 				shrinkPortal(level, entry, close);
 			}
-			boolean visible = PortalSight.visible(level, eye, center);
-			entry.visibility = Mth.lerp(Math.min(1.0f, frameSeconds * VISIBILITY_RATE), entry.visibility, visible ? 1.0f : 0.0f);
+			float visible = PortalSight.visibility(level, eye, center, entry.right);
+			entry.visibility = Mth.lerp(Math.min(1.0f, frameSeconds * VISIBILITY_RATE), entry.visibility, visible);
 			if (entry.visibility < 0.01f) {
 				entry.visibility = 0.0f;
 				continue;
@@ -142,8 +148,8 @@ public final class PortalDistortRenderer {
 				continue;
 			}
 			Vec3 center = Vec3.atCenterOf(source.center);
-			boolean visible = PortalSight.visible(level, eye, center);
-			source.flameVisibility = Mth.lerp(Math.min(1.0f, frameSeconds * VISIBILITY_RATE), source.flameVisibility, visible ? 1.0f : 0.0f);
+			float visible = PortalSight.visibility(level, eye, center, source.right);
+			source.flameVisibility = Mth.lerp(Math.min(1.0f, frameSeconds * VISIBILITY_RATE), source.flameVisibility, visible);
 			if (source.flameVisibility < 0.01f) {
 				source.flameVisibility = 0.0f;
 				continue;
@@ -158,7 +164,7 @@ public final class PortalDistortRenderer {
 		}
 		// Yang paling dekat lebih dulu: hanya MAX_SOURCES baris yang muat di tekstur data.
 		quads.sort(Comparator.comparingDouble(Quad::distance));
-		writeData(quads, (float) (nowTicks / 20.0 % 64.0));
+		writeData(camera, quads, (float) (nowTicks / 20.0 % 64.0));
 		chain.process(main, pool);
 	}
 
@@ -214,7 +220,9 @@ public final class PortalDistortRenderer {
 		if (r == null || u == null) {
 			return null;
 		}
-		return new Quad(c[0] / width, c[1] / height, r[0] / width, r[1] / height, u[0] / width, u[1] / height, strength, seed, distance, flame, close);
+		Vec3 normal = rightDir.getAxis() == Direction.Axis.X ? new Vec3(0.0, 0.0, 1.0) : new Vec3(1.0, 0.0, 0.0);
+		return new Quad(c[0] / width, c[1] / height, r[0] / width, r[1] / height, u[0] / width, u[1] / height, strength, seed, distance, flame, close,
+			DepthOcclusion.Source.plane(center, normal, PLANE_RADIUS_BLOCKS));
 	}
 
 	/**
@@ -244,7 +252,7 @@ public final class PortalDistortRenderer {
 	/** Proyeksi titik dunia ke piksel layar (asal kiri-atas); null jika di belakang kamera. */
 	private static float[] project(Camera camera, Vec3 target, int width, int height) {
 		Vec3 eye = camera.position();
-		camera.getViewRotationProjectionMatrix(MATRIX);
+		LevelMatrices.viewProjection(camera, MATRIX);
 		TMP.set((float) (target.x - eye.x), (float) (target.y - eye.y), (float) (target.z - eye.z), 1.0f);
 		MATRIX.transform(TMP);
 		if (TMP.w <= 0.0f) {
@@ -253,7 +261,7 @@ public final class PortalDistortRenderer {
 		return new float[] {(TMP.x / TMP.w * 0.5f + 0.5f) * width, (1.0f - (TMP.y / TMP.w * 0.5f + 0.5f)) * height};
 	}
 
-	private static void writeData(List<Quad> quads, float seconds) {
+	private static void writeData(Camera camera, List<Quad> quads, float seconds) {
 		NativeImage image = dataTexture.getPixels();
 		for (int row = 0; row < MAX_SOURCES; row++) {
 			if (row >= quads.size()) {
@@ -283,6 +291,11 @@ public final class PortalDistortRenderer {
 		for (int column = 1; column < DATA_WIDTH; column++) {
 			image.setPixelABGR(column, ROW_GLOBAL, 0);
 		}
+		OCCLUDERS.clear();
+		for (int i = 0; i < quads.size() && i < MAX_SOURCES; i++) {
+			OCCLUDERS.add(quads.get(i).occluder());
+		}
+		OCCLUSION.write(image, camera, OCCLUDERS);
 		dataTexture.upload();
 	}
 
@@ -321,7 +334,9 @@ public final class PortalDistortRenderer {
 			SCREENQUAD, Identifier.fromNamespaceAndPath(BackroomsMod.MOD_ID, "post/portal_distort"),
 			List.of(
 				new PostChainConfig.TargetInput("In", MAIN, false, true),
-				new PostChainConfig.TextureInput("Data", DATA_INPUT_ID, DATA_WIDTH, DATA_HEIGHT, false)),
+				new PostChainConfig.TextureInput("Data", DATA_INPUT_ID, DATA_WIDTH, DATA_HEIGHT, false),
+				// Depth buffer main: oklusi per piksel. Urutan input = urutan SamplerInfo di shader: In, Data, Depth.
+				OCCLUSION.depthInput("Depth")),
 			SWAP, new LinkedHashMap<>());
 
 		Map<String, List<UniformValue>> blitUniforms = new LinkedHashMap<>();

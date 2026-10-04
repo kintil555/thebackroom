@@ -19,6 +19,9 @@
 // HistSampler = hasil frame sebelumnya (target persisten), sebelum overlay flashbang (lihat portal_flash.fsh).
 // DepthSampler = depth buffer main. Oklusi per piksel: glow hanya digambar di piksel yang permukaan terlihatnya tidak jauh lebih
 // dekat ke kamera daripada sumber, jadi glow yang tertutup blok setengahnya tetap muncul utuh di bagian yang tidak tertutup.
+// Texel 3 tiap baris sumber: r = bagian portal yang terlihat 0..1 (garis pandang blok), menskalakan halo yang menyebar di atas penutup.
+// Inti bloom dipotong per piksel oleh depth buffer; halo lebar menyebar melewati tepi bangunan (bloom sungguhan) sebanding bagian portal yang terlihat.
+// Distorsi/blur berpusat di portal (bukan di tengah layar) dan juga dibatasi oklusi depth, jadi tidak mengikuti kamera dan tidak tembus benda.
 // Urutan SamplerInfo mengikuti urutan input chain: In, Data, Hist, Depth.
 uniform sampler2D InSampler;
 uniform sampler2D DataSampler;
@@ -53,6 +56,8 @@ const float DARKEN_MAX = 0.72;      // 0.72 = pada puncak, latar tinggal 28% ter
 const float DARKEN_VIGNETTE = 0.5;  // tambahan gelap di tepi layar (0 = merata)
 const int BLUR_TAPS = 16;
 const float TAU = 6.2831853;
+// Seberapa bebas halo menyebar di atas permukaan yang lebih dekat dari portal (0 = dipotong per piksel seperti inti, 1 = tanpa potongan).
+const float HALO_BLEED = 0.85;
 
 float decode16(vec2 hiLo) {
     return (floor(hiLo.x * 255.0 + 0.5) * 256.0 + floor(hiLo.y * 255.0 + 0.5)) / 65535.0;
@@ -60,12 +65,13 @@ float decode16(vec2 hiLo) {
 
 // Inti + badan lembut + halo lebar, semuanya jatuh ke nol di tepi radius. spread -> 1 melebarkan inti dan badan
 // sehingga plateau terang menutupi seluruh portal (bulat, tidak lonjong).
-float glowShape(float d, float spread) {
+// x = inti (dipotong ketat per piksel oleh depth), y = badan + halo (menyebar melewati penutup).
+vec2 glowShape(float d, float spread) {
     float core = exp(-d * d * mix(42.0, 7.0, spread));
     float body = exp(-d * d * mix(10.0, 3.5, spread));
     float halo = 1.0 / (1.0 + d * d * mix(16.0, 6.0, spread));
-    float shape = 1.25 * core + 0.60 * body + 0.28 * halo;
-    return shape * (1.0 - smoothstep(0.65, 1.0, d));
+    float fade = 1.0 - smoothstep(0.65, 1.0, d);
+    return vec2(1.25 * core, 0.60 * body + 0.28 * halo) * fade;
 }
 
 // Gradien warna radial: inti putih -> kuning kehijauan (tint) -> hijau di tepi.
@@ -85,19 +91,37 @@ void main() {
     float dark = decode16(expData.rg);
     float trail = texelFetch(DataSampler, ivec2(2, MAX_SOURCES + 1), 0).r;
 
+    vec2 pixel = vec2(texCoord.x, 1.0 - texCoord.y) * OutSize;
+
+    // Distorsi dan blur berpusat di portal terdekat (baris 0) dan hanya di piksel yang tidak menutupi portal, sehingga diam di dunia
+    // dan tidak tembus dinding; tanpa portal di layar tidak ada distorsi.
+    vec4 nearPos = texelFetch(DataSampler, ivec2(0, 0), 0);
+    vec4 nearSize = texelFetch(DataSampler, ivec2(1, 0), 0);
+    float nearRadius = decode16(nearSize.rg) * 2.0 * OutSize.y;
+    vec2 nearCenter = (vec2(decode16(nearPos.rg), decode16(nearPos.ba)) * 2.0 - 0.5) * OutSize;
+    float warpMask = 0.0;
+    if (warp > 0.001 && nearRadius > 1.0) {
+        float radial = 1.0 - smoothstep(0.35, 1.25, length((pixel - nearCenter) / nearRadius));
+        if (radial > 0.001) {
+            warpMask = radial * depthOcclusionOpenness(DepthSampler, DepthSize, DataSampler, OCCLUSION_ROW, 0, texCoord);
+        }
+    }
+    float warpHere = warp * warpMask;
+
     vec3 sceneColor;
-    if (warp > 0.001) {
+    if (warpHere > 0.001) {
         // Distorsi: lensa yang berdenyut antara cembung dan cekung ditambah riak halus (kelipatan bulat dari fase agar loop mulus).
-        vec2 c = texCoord - 0.5;
+        vec2 nearUv = vec2(nearCenter.x / OutSize.x, 1.0 - nearCenter.y / OutSize.y);
+        vec2 c = texCoord - nearUv;
         float aspect = OutSize.x / OutSize.y;
         vec2 ac = c * vec2(aspect, 1.0);
-        float lens = LENS_STRENGTH * warp * sin(phase);
+        float lens = LENS_STRENGTH * warpHere * sin(phase);
         c *= 1.0 + lens * dot(ac, ac);
         vec2 uv = 0.5 + c;
-        uv += vec2(sin(uv.y * 14.0 + phase * 2.0), cos(uv.x * 11.0 + phase)) * WAVE_STRENGTH * warp;
+        uv += vec2(sin(uv.y * 14.0 + phase * 2.0), cos(uv.x * 11.0 + phase)) * WAVE_STRENGTH * warpHere;
 
         // Blur: sampling spiral di sekitar uv terdistorsi.
-        float radiusPx = warp * BLUR_MAX_PX * (OutSize.y / 1080.0);
+        float radiusPx = warpHere * BLUR_MAX_PX * (OutSize.y / 1080.0);
         vec2 texel = 1.0 / OutSize;
         vec3 acc = vec3(0.0);
         for (int k = 0; k < BLUR_TAPS; k++) {
@@ -107,13 +131,12 @@ void main() {
         }
         sceneColor = acc / float(BLUR_TAPS);
     } else {
-        sceneColor = texture(InSampler, texCoord).rgb;
+        sceneColor = textureLod(InSampler, texCoord, 0.0).rgb;
     }
 
     // Exposure: dunia digelapkan lebih dulu, bloom ditambahkan di atasnya sehingga latar tampak lebih gelap dari bloom.
     vec2 fromCenter = texCoord - 0.5;
     sceneColor *= (1.0 - DARKEN_MAX * dark) * (1.0 - DARKEN_VIGNETTE * dark * dot(fromCenter, fromCenter) * 2.0);
-    vec2 pixel = vec2(texCoord.x, 1.0 - texCoord.y) * OutSize;
 
     vec3 glow = vec3(0.0);
     for (int i = 0; i < MAX_SOURCES; i++) {
@@ -131,11 +154,16 @@ void main() {
             continue;
         }
         float openness = depthOcclusionOpenness(DepthSampler, DepthSize, DataSampler, OCCLUSION_ROW, i, texCoord);
-        if (openness <= 0.001) {
+        float seen = texelFetch(DataSampler, ivec2(3, i), 0).r;
+        // Inti: potong ketat per piksel. Halo: menyebar melewati tepi penutup, sebanding bagian portal yang terlihat (0 = tertutup penuh).
+        float haloOpen = mix(openness, 1.0, HALO_BLEED) * seen;
+        vec2 shape = glowShape(d, texelFetch(DataSampler, ivec2(2, i), 0).a);
+        float weight = shape.x * openness + shape.y * haloOpen;
+        if (weight <= 0.0005) {
             continue;
         }
         vec4 tintData = texelFetch(DataSampler, ivec2(2, i), 0);
-        glow += glowColor(tintData.rgb, d) * glowShape(d, tintData.a) * intensity * GAIN * openness;
+        glow += glowColor(tintData.rgb, d) * weight * intensity * GAIN;
     }
 
     // Screen-blend lewat eksponensial: menambah terang dengan mulus dan mendekati putih tanpa clipping keras.

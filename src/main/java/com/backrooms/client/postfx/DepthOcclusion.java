@@ -114,7 +114,7 @@ public record DepthOcclusion(int firstRow, int maxSources, float near, float far
 	 * diabaikan; slot yang tak terpakai diisi 0. Pemanggil tetap harus memanggil {@code upload()} pada tekstur.
 	 */
 	public void write(NativeImage image, Camera camera, List<Source> sources) {
-		camera.getViewRotationProjectionMatrix(MATRIX);
+		LevelMatrices.viewProjection(camera, MATRIX);
 		MATRIX.invert(INVERSE);
 		INVERSE.get(VALUES);
 		for (int x = 0; x < WIDTH; x++) {

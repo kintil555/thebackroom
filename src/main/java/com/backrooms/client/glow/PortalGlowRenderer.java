@@ -1,5 +1,6 @@
 package com.backrooms.client.glow;
 
+import com.backrooms.client.postfx.LevelMatrices;
 import com.backrooms.BackroomsMod;
 import com.backrooms.client.postfx.DepthOcclusion;
 import com.mojang.blaze3d.pipeline.RenderTarget;
@@ -115,7 +116,7 @@ public final class PortalGlowRenderer {
 	}
 
 	/** Posisi layar ternormalisasi (asal kiri-atas), radius sebagai fraksi tinggi layar, dan intensitas akhir. */
-	private record Glow(float x, float y, float radius, float intensity, float spread, DepthOcclusion.Source occluder) {
+	private record Glow(float x, float y, float radius, float intensity, float spread, float visibility, DepthOcclusion.Source occluder) {
 	}
 
 	/** Dipanggil tiap frame setelah dunia tergambar dan sebelum GUI. Tidak melakukan apa-apa jika tak ada sumber. */
@@ -213,7 +214,7 @@ public final class PortalGlowRenderer {
 		float near = Mth.clamp((float) Math.sqrt(distanceSq) / NEAR_DISTANCE_BLOCKS, MIN_NEAR_FACTOR, 1.0f);
 		float intensity = envelope * flicker * fadeIn * near;
 
-		return new Glow(projected[0] / width, projected[1] / height, Math.min(2.0f, projected[2] / height), intensity, spread,
+		return new Glow(projected[0] / width, projected[1] / height, Math.min(2.0f, projected[2] / height), intensity, spread, source.visibility,
 			DepthOcclusion.Source.plane(target, portalNormal(source), PORTAL_PLANE_RADIUS_BLOCKS));
 	}
 
@@ -223,8 +224,8 @@ public final class PortalGlowRenderer {
 	 * memudar cepat sampai 0. Kaca, iron bars, dan blok transparan lain tidak dianggap penutup.
 	 */
 	private static void updateVisibility(PortalGlowManager.Source source, ClientLevel level, Vec3 eye, float frameSeconds) {
-		boolean visible = PortalSight.visible(level, eye, Vec3.atCenterOf(source.center));
-		source.visibility = Mth.lerp(Math.min(1.0f, frameSeconds * VISIBILITY_RATE), source.visibility, visible ? 1.0f : 0.0f);
+		float visible = PortalSight.visibility(level, eye, Vec3.atCenterOf(source.center), source.right);
+		source.visibility = Mth.lerp(Math.min(1.0f, frameSeconds * VISIBILITY_RATE), source.visibility, visible);
 		if (source.visibility < 0.01f) {
 			source.visibility = 0.0f;
 		}
@@ -316,7 +317,7 @@ public final class PortalGlowRenderer {
 	/** Proyeksi titik dunia ke piksel layar (asal kiri-atas) beserta radius piksel pada kedalaman itu; null jika di luar pandangan. */
 	private static float[] project(Camera camera, Vec3 target, float radiusBlocks, int width, int height) {
 		Vec3 eye = camera.position();
-		camera.getViewRotationProjectionMatrix(MATRIX);
+		LevelMatrices.viewProjection(camera, MATRIX);
 		TMP.set((float) (target.x - eye.x), (float) (target.y - eye.y), (float) (target.z - eye.z), 1.0f);
 		MATRIX.transform(TMP);
 		if (TMP.w <= 0.0f) {
@@ -350,6 +351,8 @@ public final class PortalGlowRenderer {
 			image.setPixelABGR(1, row, abgr(radius >> 8, radius & 0xFF, intensity >> 8, intensity & 0xFF));
 			// Alpha texel 2 = spread (8 bit).
 			image.setPixelABGR(2, row, abgr(TINT_R, TINT_G, TINT_B, Math.round(Mth.clamp(glow.spread(), 0.0f, 1.0f) * 255.0f)));
+			// Texel 3 r = bagian portal yang terlihat (0..1), menskalakan halo yang menyebar di atas penutup.
+			image.setPixelABGR(3, row, abgr(Math.round(Mth.clamp(glow.visibility(), 0.0f, 1.0f) * 255.0f), 0, 0, 255));
 		}
 		// Baris parameter kamera: texel 0 = warp (16 bit) + blur (16 bit), texel 1 = fase waktu 0..1 (16 bit),
 		// texel 2 = r,g exposure/gelap (16 bit), b = putih flashbang (8 bit), a = bayangan sisa flashbang (8 bit).

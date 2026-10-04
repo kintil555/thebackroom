@@ -1,5 +1,6 @@
 package com.backrooms.client.light;
 
+import com.backrooms.client.postfx.LevelMatrices;
 import com.backrooms.BackroomsMod;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.platform.NativeImage;
@@ -91,7 +92,7 @@ public final class LampBloomRenderer {
 
 	private static void writeData(Camera camera, Vec3 eye, List<LampBloom.Lamp> lamps) {
 		NativeImage image = dataTexture.getPixels();
-		camera.getViewRotationProjectionMatrix(MATRIX);
+		LevelMatrices.viewProjection(camera, MATRIX);
 		MATRIX.invert(INVERSE);
 		INVERSE.get(MATRIX_VALUES);
 		for (int i = 0; i < 16; i++) {

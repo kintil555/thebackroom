@@ -1,6 +1,7 @@
 package com.backrooms.client.glow;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
@@ -25,6 +26,25 @@ public final class PortalSight {
 	 */
 	static boolean visible(BlockGetter level, Vec3 eye, Vec3 center) {
 		return clear(level, eye, center) || clear(level, eye, center.add(0.0, 1.8, 0.0)) || clear(level, eye, center.add(0.0, -1.8, 0.0));
+	}
+
+	/**
+	 * Keterlihatan portal 0..1 dari 9 garis pandang yang tersebar di ruang portal (lebar sepanjang {@code right}, tinggi 5 blok).
+	 * Tidak lagi hidup/mati dari satu garis ke tengah: tengah tertutup tiang tetap terhitung sebagian terlihat. Pembagian per piksel
+	 * dilakukan depth buffer di shader; nilai ini hanya menskalakan kekuatan efek. Tiga garis terbuka sudah dianggap penuh.
+	 */
+	static float visibility(BlockGetter level, Vec3 eye, Vec3 center, Direction right) {
+		Vec3 axis = Vec3.atLowerCornerOf(right.getUnitVec3i()).scale(1.0);
+		int clear = 0;
+		for (int column = -1; column <= 1; column++) {
+			for (int row = -1; row <= 1; row++) {
+				Vec3 point = center.add(axis.scale(column * 1.0)).add(0.0, row * 1.8, 0.0);
+				if (clear(level, eye, point)) {
+					clear++;
+				}
+			}
+		}
+		return Math.min(1.0f, clear / 3.0f);
 	}
 
 	private static boolean blocks(BlockGetter level, BlockPos pos, Vec3 from, Vec3 to) {

@@ -1,5 +1,6 @@
 package com.backrooms.client.light;
 
+import com.backrooms.client.postfx.LevelMatrices;
 import com.backrooms.BackroomsMod;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.platform.NativeImage;
@@ -101,7 +102,7 @@ public final class ColoredLightRenderer {
 
 	private static void writeData(Camera camera, Vec3 eye, List<ColoredLights.Sample> lights) {
 		NativeImage image = dataTexture.getPixels();
-		camera.getViewRotationProjectionMatrix(MATRIX);
+		LevelMatrices.viewProjection(camera, MATRIX);
 		MATRIX.invert(INVERSE);
 		INVERSE.get(MATRIX_VALUES);
 		for (int i = 0; i < 16; i++) {
