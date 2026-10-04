@@ -24,8 +24,6 @@ import net.minecraft.client.renderer.UniformValue;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.Mth;
-import net.minecraft.world.level.ClipContext;
-import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
 import org.joml.Vector3fc;
@@ -167,8 +165,8 @@ public final class PortalGlowRenderer {
 		}
 
 		// Glow ini efek layar tanpa depth test; tanpa cek ini ia akan tembus dinding. Tengah portal yang tertutup
-		// blok memudar halus, bukan lenyap seketika.
-		boolean clear = level.clip(new ClipContext(eye, target, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, player)).getType() == HitResult.Type.MISS;
+		// blok memudar halus, bukan lenyap seketika. Kaca, iron bars, dan blok transparan lain tidak dianggap penutup.
+		boolean clear = PortalSight.clear(level, eye, target);
 		source.visibility = Mth.lerp(Math.min(1.0f, frameSeconds * VISIBILITY_RATE), source.visibility, clear ? 1.0f : 0.0f);
 		if (source.visibility <= 0.01f) {
 			return null;
