@@ -1,6 +1,7 @@
 package com.backrooms.client.glow;
 
 import com.backrooms.BackroomsMod;
+import com.backrooms.client.postfx.DepthOcclusion;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.resource.CrossFrameResourcePool;
@@ -39,11 +40,14 @@ import org.joml.Vector4f;
  */
 public final class PortalGlowRenderer {
 	private static final int MAX_SOURCES = 4;
-	private static final int DATA_WIDTH = 3;
+	private static final int DATA_WIDTH = DepthOcclusion.WIDTH;
 	/** Baris setelah sumber: parameter efek kamera (warp/blur, exposure, flashbang), lalu posisi bayangan sisa flashbang. */
 	private static final int ROW_CAMERA = MAX_SOURCES;
 	private static final int ROW_FLASH = MAX_SOURCES + 1;
-	private static final int DATA_HEIGHT = MAX_SOURCES + 2;
+	/** Oklusi depth per piksel (API DepthOcclusion); baris pertamanya harus sama dengan OCCLUSION_ROW di portal_glow.fsh. */
+	private static final DepthOcclusion OCCLUSION = DepthOcclusion.at(MAX_SOURCES + 2).range(1.0f, 2.5f);
+	private static final float[] SOURCE_DISTANCES = new float[MAX_SOURCES];
+	private static final int DATA_HEIGHT = OCCLUSION.endRow();
 
 	/** Tempat tekstur data didaftarkan. PostChain me-resolve input tekstur ke {@code textures/effect/<path>.png}. */
 	private static final Identifier DATA_TEXTURE_ID = Identifier.fromNamespaceAndPath(BackroomsMod.MOD_ID, "textures/effect/portal_glow_data.png");
@@ -108,7 +112,7 @@ public final class PortalGlowRenderer {
 	}
 
 	/** Posisi layar ternormalisasi (asal kiri-atas), radius sebagai fraksi tinggi layar, dan intensitas akhir. */
-	private record Glow(float x, float y, float radius, float intensity, float spread) {
+	private record Glow(float x, float y, float radius, float intensity, float spread, float distance) {
 	}
 
 	/** Dipanggil tiap frame setelah dunia tergambar dan sebelum GUI. Tidak melakukan apa-apa jika tak ada sumber. */
@@ -163,7 +167,7 @@ public final class PortalGlowRenderer {
 
 		// Yang paling dekat (radius layar terbesar) lebih dulu: hanya MAX_SOURCES baris yang muat di tekstur data.
 		glows.sort(Comparator.comparingDouble(Glow::radius).reversed());
-		writeData(glows, warp, (float) (nowTicks / 80.0 % 1.0), dark, flashWhite, ghost, trail);
+		writeData(camera, glows, warp, (float) (nowTicks / 80.0 % 1.0), dark, flashWhite, ghost, trail);
 		chain.process(main, pool);
 		historyValid = true;
 	}
@@ -179,11 +183,8 @@ public final class PortalGlowRenderer {
 			return null;
 		}
 
-		// Keterlihatan sudah diperbarui di updateVisibility; portal yang tertutup blok tidak digambar.
-		if (source.visibility <= 0.01f) {
-			return null;
-		}
-
+		// Oklusi glow dihitung per piksel di portal_glow.fsh dari depth buffer, jadi bloom yang tertutup sebagian tetap tergambar
+		// di bagian yang tidak tertutup. source.visibility hanya dipakai efek layar penuh (warp, exposure, flashbang).
 		double elapsedTicks = nowTicks - source.startTick;
 		float progress = Mth.clamp((float) (elapsedTicks / source.durationTicks), 0.0f, 1.0f);
 		float rise = riseLevel(progress);
@@ -207,14 +208,15 @@ public final class PortalGlowRenderer {
 
 		float fadeIn = PortalGlowFlicker.smooth(FADE_IN_TICKS, (float) elapsedTicks);
 		float near = Mth.clamp((float) Math.sqrt(distanceSq) / NEAR_DISTANCE_BLOCKS, MIN_NEAR_FACTOR, 1.0f);
-		float intensity = envelope * flicker * fadeIn * near * source.visibility;
+		float intensity = envelope * flicker * fadeIn * near;
 
-		return new Glow(projected[0] / width, projected[1] / height, Math.min(2.0f, projected[2] / height), intensity, spread);
+		return new Glow(projected[0] / width, projected[1] / height, Math.min(2.0f, projected[2] / height), intensity, spread,
+			(float) Math.sqrt(distanceSq));
 	}
 
 	/**
-	 * Memperbarui keterlihatan portal dari kamera. Efek layar tanpa depth test akan tembus dinding, jadi bloom dan semua
-	 * efek sampingnya (warp, exposure, flashbang, jejak) hanya digambar selagi portal terlihat; berlindung di balik blok
+	 * Memperbarui keterlihatan portal dari kamera. Efek layar penuh tanpa depth test akan tembus dinding, jadi
+	 * efek sampingnya (warp, exposure, flashbang, jejak) hanya digambar selagi portal terlihat (bloom sendiri memakai depth buffer per piksel); berlindung di balik blok
 	 * memudar cepat sampai 0. Kaca, iron bars, dan blok transparan lain tidak dianggap penutup.
 	 */
 	private static void updateVisibility(PortalGlowManager.Source source, ClientLevel level, Vec3 eye, float frameSeconds) {
@@ -327,7 +329,7 @@ public final class PortalGlowRenderer {
 		return new float[] {px, py, radius};
 	}
 
-	private static void writeData(List<Glow> glows, float warp, float phase, float dark, float flashWhite, float ghost, float trail) {
+	private static void writeData(Camera camera, List<Glow> glows, float warp, float phase, float dark, float flashWhite, float ghost, float trail) {
 		NativeImage image = dataTexture.getPixels();
 		for (int row = 0; row < MAX_SOURCES; row++) {
 			if (row >= glows.size()) {
@@ -363,7 +365,17 @@ public final class PortalGlowRenderer {
 		image.setPixelABGR(1, ROW_FLASH, abgr(ghostRadius >> 8, ghostRadius & 0xFF, 0, 0));
 		// Texel 2 baris flashbang: r = jejak frame sebelumnya (8 bit).
 		image.setPixelABGR(2, ROW_FLASH, abgr(Math.round(Mth.clamp(trail, 0.0f, 1.0f) * 255.0f), 0, 0, 0));
+		writeDepthRows(image, camera, glows);
 		dataTexture.upload();
+	}
+
+	/** Jarak tiap sumber + invers matriks kamera ke tekstur data lewat API DepthOcclusion. */
+	private static void writeDepthRows(NativeImage image, Camera camera, List<Glow> glows) {
+		int count = Math.min(MAX_SOURCES, glows.size());
+		for (int i = 0; i < count; i++) {
+			SOURCE_DISTANCES[i] = glows.get(i).distance();
+		}
+		OCCLUSION.write(image, camera, SOURCE_DISTANCES, count);
 	}
 
 	private static int encode16(float value) {
@@ -401,14 +413,16 @@ public final class PortalGlowRenderer {
 	}
 
 	/**
-	 * main + history -> portal_glow.fsh -> swap; swap -> blit -> history (persisten); swap -> portal_flash.fsh -> main.
+	 * main + history + depth main -> portal_glow.fsh -> swap; swap -> blit -> history (persisten); swap -> portal_flash.fsh -> main.
 	 * Vanilla tidak pernah membaca dan menulis target yang sama dalam satu pass.
 	 */
 	private static PostChainConfig buildConfig() {
 		List<PostChainConfig.Input> glowInputs = List.of(
 			new PostChainConfig.TargetInput("In", MAIN, false, true),
 			dataInput(),
-			new PostChainConfig.TargetInput("Hist", HISTORY, false, false)
+			new PostChainConfig.TargetInput("Hist", HISTORY, false, false),
+			// Depth buffer main: oklusi glow per piksel. Urutan input = urutan SamplerInfo di shader.
+			OCCLUSION.depthInput("Depth")
 		);
 		PostChainConfig.Pass glowPass = new PostChainConfig.Pass(
 			SCREENQUAD, Identifier.fromNamespaceAndPath(BackroomsMod.MOD_ID, "post/portal_glow"), glowInputs, SWAP, new LinkedHashMap<>());

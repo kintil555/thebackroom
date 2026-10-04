@@ -1,7 +1,7 @@
 #version 330
 
 // Bloom/glow di tengah portal yang sedang mengisi energi. Posisi, radius, intensitas, dan warna datang dari
-// DataSampler (tekstur 3x4, ditulis ulang tiap frame oleh PortalGlowRenderer), sehingga satu chain statis cukup
+// DataSampler (tekstur 16x8, ditulis ulang tiap frame oleh PortalGlowRenderer), sehingga satu chain statis cukup
 // dan tidak perlu dibangun ulang saat kamera bergerak atau intensitas berkedip.
 //
 // Satu baris = satu sumber (maksimal 4), 8 bit per kanal:
@@ -15,23 +15,33 @@
 //   texel 1: r,g = fase waktu 0..1 (16 bit, satu putaran = 4 detik)
 //   texel 2: r,g = exposure/gelap 0..1 (16 bit)
 // Baris ke-5 (index 5), texel 2: r = jejak frame sebelumnya 0..1 (flashbang: 0 = tanpa jejak, mendekati 1 = frame lama bertahan lama).
+// Baris ke-6 dan ke-7 = blok oklusi depth (API DepthOcclusion: invers matriks kamera + jarak tiap sumber).
 // HistSampler = hasil frame sebelumnya (target persisten), sebelum overlay flashbang (lihat portal_flash.fsh).
+// DepthSampler = depth buffer main. Oklusi per piksel: glow hanya digambar di piksel yang permukaan terlihatnya tidak jauh lebih
+// dekat ke kamera daripada sumber, jadi glow yang tertutup blok setengahnya tetap muncul utuh di bagian yang tidak tertutup.
+// Urutan SamplerInfo mengikuti urutan input chain: In, Data, Hist, Depth.
 uniform sampler2D InSampler;
 uniform sampler2D DataSampler;
 uniform sampler2D HistSampler;
+uniform sampler2D DepthSampler;
 
 layout(std140) uniform SamplerInfo {
     vec2 OutSize;
     vec2 InSize;
     vec2 DataSize;
     vec2 HistSize;
+    vec2 DepthSize;
 };
+
+#moj_import <backrooms:depth_occlusion.glsl>
 
 in vec2 texCoord;
 
 out vec4 fragColor;
 
 const int MAX_SOURCES = 4;
+// Baris pertama blok oklusi depth (lihat DepthOcclusion.java); harus sama dengan DepthOcclusion.at(...) di PortalGlowRenderer.
+const int OCCLUSION_ROW = MAX_SOURCES + 2;
 // Penguat sebelum kurva saturasi: inti glow melewati 1.0 sehingga memutih seperti bloom sungguhan.
 const float GAIN = 4.5;
 // Efek kamera. Ubah angka ini untuk menyetel kekuatannya.
@@ -120,8 +130,12 @@ void main() {
         if (d >= 1.0) {
             continue;
         }
+        float openness = depthOcclusionOpenness(DepthSampler, DepthSize, DataSampler, OCCLUSION_ROW, i, texCoord);
+        if (openness <= 0.001) {
+            continue;
+        }
         vec4 tintData = texelFetch(DataSampler, ivec2(2, i), 0);
-        glow += glowColor(tintData.rgb, d) * glowShape(d, tintData.a) * intensity * GAIN;
+        glow += glowColor(tintData.rgb, d) * glowShape(d, tintData.a) * intensity * GAIN * openness;
     }
 
     // Screen-blend lewat eksponensial: menambah terang dengan mulus dan mendekati putih tanpa clipping keras.
