@@ -7,8 +7,8 @@ import net.minecraft.world.phys.Vec3;
 
 /**
  * Efek seperti terkena flashbang: saat burst bloom berakhir (portal terbuka), pemain dalam {@link #RANGE_BLOCKS} dari
- * titik portal mendapat layar putih yang memudar, disusul bayangan sisa (afterimage) yang tertinggal di posisi layar
- * tempat bloom tadi terlihat, plus blur dan gambar ganda tipis yang memudar lebih lambat dari putihnya.
+ * titik portal mendapat layar putih yang memudar, bayangan sisa (afterimage) di posisi layar tempat bloom tadi terlihat,
+ * dan jejak frame sebelumnya: kamera bergerak tetapi gambar lama bertahan dan memudar pelan seperti motion blur.
  *
  * <p>Seluruhnya client-side dan hanya satu efek aktif pada satu waktu (efek baru menggantikan yang lama). Shader
  * {@code portal_glow.fsh} yang menggambarnya; parameter dikirim lewat {@link PortalGlowRenderer}.
@@ -99,7 +99,12 @@ final class PortalFlash {
 		return strength * (1.0f - fade);
 	}
 
-	/** Kekuatan bayangan sisa + blur + gambar ganda 0..1. */
+	/** Kekuatan jejak frame sebelumnya 0..1: tinggi sesaat setelah flash, lalu memudar pelan (akar agar jejaknya bertahan lebih lama). */
+	static float trail(double nowTicks) {
+		return (float) Math.sqrt(ghost(nowTicks));
+	}
+
+	/** Kekuatan bayangan sisa 0..1. */
 	static float ghost(double nowTicks) {
 		if (!active(nowTicks)) {
 			return 0.0f;

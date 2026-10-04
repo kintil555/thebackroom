@@ -13,16 +13,18 @@
 // Baris ke-4 (index 4) = efek kamera di dekat portal:
 //   texel 0: r,g = kekuatan distorsi+blur 0..1 (16 bit)
 //   texel 1: r,g = fase waktu 0..1 (16 bit, satu putaran = 4 detik)
-//   texel 2: r,g = exposure/gelap 0..1 (16 bit)   b = lapisan putih flashbang 0..1   a = bayangan sisa flashbang 0..1
-// Baris ke-5 (index 5) = posisi bayangan sisa flashbang (layar tetap, tidak ikut kamera):
-//   texel 0: r,g = x   b,a = y (sama seperti baris sumber)   texel 1: r,g = radius/2 (fraksi tinggi layar)
+//   texel 2: r,g = exposure/gelap 0..1 (16 bit)
+// Baris ke-5 (index 5), texel 2: r = jejak frame sebelumnya 0..1 (flashbang: 0 = tanpa jejak, mendekati 1 = frame lama bertahan lama).
+// HistSampler = hasil frame sebelumnya (target persisten), sebelum overlay flashbang (lihat portal_flash.fsh).
 uniform sampler2D InSampler;
 uniform sampler2D DataSampler;
+uniform sampler2D HistSampler;
 
 layout(std140) uniform SamplerInfo {
     vec2 OutSize;
     vec2 InSize;
     vec2 DataSize;
+    vec2 HistSize;
 };
 
 in vec2 texCoord;
@@ -39,10 +41,6 @@ const float BLUR_MAX_PX = 18.0;    // radius blur maksimum pada layar tinggi 108
 // Exposure: latar menggelap saat bloom besar dan terang, bloom sendiri tetap terang (ditambahkan setelahnya).
 const float DARKEN_MAX = 0.72;      // 0.72 = pada puncak, latar tinggal 28% terangnya
 const float DARKEN_VIGNETTE = 0.5;  // tambahan gelap di tepi layar (0 = merata)
-// Flashbang: bayangan sisa gelap keunguan di tempat bloom tadi terlihat, dengan blur dan gambar ganda yang memudar.
-const vec3 AFTERIMAGE_TINT = vec3(0.22, 0.10, 0.28);
-const float GHOST_BLUR = 0.85;      // blur flashbang relatif terhadap blur maksimum
-const float GHOST_ECHO = 0.35;      // seberapa kuat gambar ganda (delay) dicampur
 const int BLUR_TAPS = 16;
 const float TAU = 6.2831853;
 
@@ -75,11 +73,10 @@ void main() {
     float warp = decode16(camData.rg);
     float phase = decode16(phaseData.rg) * TAU;
     float dark = decode16(expData.rg);
-    float flash = expData.b;
-    float ghost = expData.a;
+    float trail = texelFetch(DataSampler, ivec2(2, MAX_SOURCES + 1), 0).r;
 
     vec3 sceneColor;
-    if (warp > 0.001 || ghost > 0.001) {
+    if (warp > 0.001) {
         // Distorsi: lensa yang berdenyut antara cembung dan cekung ditambah riak halus (kelipatan bulat dari fase agar loop mulus).
         vec2 c = texCoord - 0.5;
         float aspect = OutSize.x / OutSize.y;
@@ -90,7 +87,7 @@ void main() {
         uv += vec2(sin(uv.y * 14.0 + phase * 2.0), cos(uv.x * 11.0 + phase)) * WAVE_STRENGTH * warp;
 
         // Blur: sampling spiral di sekitar uv terdistorsi.
-        float radiusPx = max(warp, ghost * GHOST_BLUR) * BLUR_MAX_PX * (OutSize.y / 1080.0);
+        float radiusPx = warp * BLUR_MAX_PX * (OutSize.y / 1080.0);
         vec2 texel = 1.0 / OutSize;
         vec3 acc = vec3(0.0);
         for (int k = 0; k < BLUR_TAPS; k++) {
@@ -99,9 +96,6 @@ void main() {
             acc += textureLod(InSampler, uv + vec2(cos(angle), sin(angle)) * r * radiusPx * texel, 0.0).rgb;
         }
         sceneColor = acc / float(BLUR_TAPS);
-        // Gambar ganda: salinan tergeser tipis yang tertinggal (delay) selama efek flashbang.
-        vec3 echo = texture(InSampler, uv + vec2(sin(phase * 3.0) * 0.012, 0.007) * ghost).rgb;
-        sceneColor = mix(sceneColor, echo, GHOST_ECHO * ghost);
     } else {
         sceneColor = texture(InSampler, texCoord).rgb;
     }
@@ -133,18 +127,12 @@ void main() {
     // Screen-blend lewat eksponensial: menambah terang dengan mulus dan mendekati putih tanpa clipping keras.
     vec3 result = 1.0 - (1.0 - sceneColor) * exp(-glow);
 
-    // Flashbang: bayangan sisa di posisi layar tetap, redup sedikit seluruh layar, lalu lapisan putih paling atas.
-    if (ghost > 0.001) {
-        vec4 ghostPos = texelFetch(DataSampler, ivec2(0, MAX_SOURCES + 1), 0);
-        vec4 ghostSize = texelFetch(DataSampler, ivec2(1, MAX_SOURCES + 1), 0);
-        float ghostRadius = decode16(ghostSize.rg) * 2.0 * OutSize.y;
-        if (ghostRadius > 1.0) {
-            vec2 ghostCenter = (vec2(decode16(ghostPos.rg), decode16(ghostPos.ba)) * 2.0 - 0.5) * OutSize;
-            float blob = 1.0 - smoothstep(0.0, 1.0, length((pixel - ghostCenter) / ghostRadius));
-            result = mix(result, result * AFTERIMAGE_TINT, clamp(ghost * blob * 0.9, 0.0, 1.0));
-        }
-        result *= 1.0 - 0.25 * ghost;
+    // Flashbang: frame sebelumnya bertahan (delay) dan baru memudar pelan, jadi gerakan kamera meninggalkan jejak seperti motion blur.
+    // Selisih dikurangi minimal 1/255 per frame agar nilai 8 bit tidak macet di sisa jejak.
+    if (trail > 0.001) {
+        vec3 history = texture(HistSampler, texCoord).rgb;
+        vec3 delta = history - result;
+        result += sign(delta) * max(abs(delta) * trail - 1.0 / 255.0, 0.0);
     }
-    result = mix(result, vec3(1.0), flash);
     fragColor = vec4(result, 1.0);
 }

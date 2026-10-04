@@ -51,6 +51,8 @@ public final class PortalGlowRenderer {
 	private static final Identifier SCREENQUAD = Identifier.parse("minecraft:core/screenquad");
 	private static final Identifier MAIN = Identifier.parse("minecraft:main");
 	private static final Identifier SWAP = Identifier.fromNamespaceAndPath(BackroomsMod.MOD_ID, "portal_glow_swap");
+	/** Hasil frame sebelumnya (target persisten) untuk jejak flashbang. */
+	private static final Identifier HISTORY = Identifier.fromNamespaceAndPath(BackroomsMod.MOD_ID, "portal_glow_history");
 
 	// --- Tampilan: ubah di sini untuk menyetel glow ---
 	// Fase isi energi: glow muncul perlahan, makin lebar dan makin terang sampai portal terbuka.
@@ -75,6 +77,8 @@ public final class PortalGlowRenderer {
 	private static final float EXPOSURE_MIN_REACH_BLOCKS = 8.0f;
 	/** Menghadap jauh dari bloom tetap menggelap sedikit (porsi dari penuh). */
 	private static final float EXPOSURE_BACK_FACTOR = 0.25f;
+	/** Persistensi jejak per 1/60 detik pada kekuatan penuh: 0.95 = tiap frame 95% gambar lama dipertahankan (jejak sekitar 0,3 detik). */
+	private static final float TRAIL_PERSISTENCE = 0.95f;
 	/** Radius bayangan sisa flashbang (blok di posisi portal, diproyeksikan ke layar saat flash terjadi). */
 	private static final float GHOST_RADIUS_BLOCKS = 5.0f;
 	/** Warna tengah glow (kuning kehijauan). Inti memutih dan tepi lebih hijau; gradiennya dihitung di portal_glow.fsh. */
@@ -97,6 +101,8 @@ public final class PortalGlowRenderer {
 	private static PostChain chain;
 	private static boolean failed;
 	private static long lastFrameNanos;
+	/** False sampai chain pernah memproses satu frame berturut-turut; history lama (dari efek sebelumnya) tidak dipakai. */
+	private static boolean historyValid;
 
 	private PortalGlowRenderer() {
 	}
@@ -113,11 +119,13 @@ public final class PortalGlowRenderer {
 		List<PortalGlowManager.Source> sources = PortalGlowManager.sources();
 		if (level == null || player == null || failed) {
 			lastFrameNanos = 0L;
+			historyValid = false;
 			return;
 		}
 		double nowTicks = level.getGameTime() + deltaTracker.getGameTimeDeltaPartialTick(false);
 		if (sources.isEmpty() && !PortalFlash.active(nowTicks)) {
 			lastFrameNanos = 0L;
+			historyValid = false;
 			return;
 		}
 
@@ -144,13 +152,17 @@ public final class PortalGlowRenderer {
 		float ghost = PortalFlash.ghost(nowTicks);
 		boolean idle = glows.isEmpty() && warp <= 0.001f && dark <= 0.001f && flashWhite <= 0.001f && ghost <= 0.001f;
 		if (idle || !ensureResources(minecraft)) {
+			historyValid = false;
 			return;
 		}
+		// Persistensi per frame disesuaikan dengan waktu frame agar panjang jejak sama di 60 maupun 240 FPS.
+		float trail = historyValid ? PortalFlash.trail(nowTicks) * (float) Math.pow(TRAIL_PERSISTENCE, frameSeconds * 60.0f) : 0.0f;
 
 		// Yang paling dekat (radius layar terbesar) lebih dulu: hanya MAX_SOURCES baris yang muat di tekstur data.
 		glows.sort(Comparator.comparingDouble(Glow::radius).reversed());
-		writeData(glows, warp, (float) (nowTicks / 80.0 % 1.0), dark, flashWhite, ghost);
+		writeData(glows, warp, (float) (nowTicks / 80.0 % 1.0), dark, flashWhite, ghost, trail);
 		chain.process(main, pool);
+		historyValid = true;
 	}
 
 	private static Glow evaluate(
@@ -302,7 +314,7 @@ public final class PortalGlowRenderer {
 		return new float[] {px, py, radius};
 	}
 
-	private static void writeData(List<Glow> glows, float warp, float phase, float dark, float flashWhite, float ghost) {
+	private static void writeData(List<Glow> glows, float warp, float phase, float dark, float flashWhite, float ghost, float trail) {
 		NativeImage image = dataTexture.getPixels();
 		for (int row = 0; row < MAX_SOURCES; row++) {
 			if (row >= glows.size()) {
@@ -336,7 +348,8 @@ public final class PortalGlowRenderer {
 		int ghostRadius = encode16(PortalFlash.ghostRadius() / 2.0f);
 		image.setPixelABGR(0, ROW_FLASH, abgr(ghostX >> 8, ghostX & 0xFF, ghostY >> 8, ghostY & 0xFF));
 		image.setPixelABGR(1, ROW_FLASH, abgr(ghostRadius >> 8, ghostRadius & 0xFF, 0, 0));
-		image.setPixelABGR(2, ROW_FLASH, 0);
+		// Texel 2 baris flashbang: r = jejak frame sebelumnya (8 bit).
+		image.setPixelABGR(2, ROW_FLASH, abgr(Math.round(Mth.clamp(trail, 0.0f, 1.0f) * 255.0f), 0, 0, 0));
 		dataTexture.upload();
 	}
 
@@ -369,23 +382,39 @@ public final class PortalGlowRenderer {
 		}
 	}
 
-	/** main -> portal_glow.fsh -> swap -> blit -> main (vanilla tidak pernah membaca dan menulis target yang sama dalam satu pass). */
+	/** Input tekstur data; pass glow dan pass flash memakai tekstur yang sama. */
+	private static PostChainConfig.Input dataInput() {
+		return new PostChainConfig.TextureInput("Data", DATA_INPUT_ID, DATA_WIDTH, DATA_HEIGHT, false);
+	}
+
+	/**
+	 * main + history -> portal_glow.fsh -> swap; swap -> blit -> history (persisten); swap -> portal_flash.fsh -> main.
+	 * Vanilla tidak pernah membaca dan menulis target yang sama dalam satu pass.
+	 */
 	private static PostChainConfig buildConfig() {
-		List<PostChainConfig.Input> inputs = List.of(
+		List<PostChainConfig.Input> glowInputs = List.of(
 			new PostChainConfig.TargetInput("In", MAIN, false, true),
-			new PostChainConfig.TextureInput("Data", DATA_INPUT_ID, DATA_WIDTH, DATA_HEIGHT, false)
+			dataInput(),
+			new PostChainConfig.TargetInput("Hist", HISTORY, false, false)
 		);
 		PostChainConfig.Pass glowPass = new PostChainConfig.Pass(
-			SCREENQUAD, Identifier.fromNamespaceAndPath(BackroomsMod.MOD_ID, "post/portal_glow"), inputs, SWAP, new LinkedHashMap<>());
+			SCREENQUAD, Identifier.fromNamespaceAndPath(BackroomsMod.MOD_ID, "post/portal_glow"), glowInputs, SWAP, new LinkedHashMap<>());
 
+		// Simpan hasil glow (tanpa overlay flashbang) sebagai history frame berikutnya.
 		Map<String, List<UniformValue>> blitUniforms = new LinkedHashMap<>();
 		blitUniforms.put("BlitConfig", List.of(new UniformValue.Vec4Uniform(new Vector4f(1.0f, 1.0f, 1.0f, 1.0f))));
-		PostChainConfig.Pass blitPass = new PostChainConfig.Pass(
+		PostChainConfig.Pass historyPass = new PostChainConfig.Pass(
 			SCREENQUAD, Identifier.parse("minecraft:post/blit"),
-			List.of(new PostChainConfig.TargetInput("In", SWAP, false, false)), MAIN, blitUniforms);
+			List.of(new PostChainConfig.TargetInput("In", SWAP, false, false)), HISTORY, blitUniforms);
+
+		// Overlay flashbang dan tulis ke main.
+		PostChainConfig.Pass flashPass = new PostChainConfig.Pass(
+			SCREENQUAD, Identifier.fromNamespaceAndPath(BackroomsMod.MOD_ID, "post/portal_flash"),
+			List.of(new PostChainConfig.TargetInput("In", SWAP, false, false), dataInput()), MAIN, new LinkedHashMap<>());
 
 		Map<Identifier, PostChainConfig.InternalTarget> targets = new LinkedHashMap<>();
 		targets.put(SWAP, new PostChainConfig.InternalTarget(Optional.empty(), Optional.empty(), false, 0));
-		return new PostChainConfig(targets, List.of(glowPass, blitPass));
+		targets.put(HISTORY, new PostChainConfig.InternalTarget(Optional.empty(), Optional.empty(), true, 0));
+		return new PostChainConfig(targets, List.of(glowPass, historyPass, flashPass));
 	}
 }
