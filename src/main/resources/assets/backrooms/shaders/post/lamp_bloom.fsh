@@ -62,7 +62,7 @@ mat4 fetchMatrix(int row) {
 float sceneDistanceAt(vec2 uv, mat4 inverseMatrix, bool zeroToOne) {
     vec2 clamped = clamp(uv, vec2(0.0), vec2(0.9999));
     float depth = texelFetch(DepthSampler, ivec2(clamped * DepthSize), 0).r;
-    if (depth >= 0.99999) {
+    if (depth <= 0.00001) {
         return 1.0e6;
     }
     vec2 ndc = clamped * 2.0 - 1.0;
@@ -75,7 +75,7 @@ float sceneDistanceAt(vec2 uv, mat4 inverseMatrix, bool zeroToOne) {
 vec3 sceneWorldAt(vec2 uv, mat4 inverseMatrix, bool zeroToOne) {
     vec2 clamped = clamp(uv, vec2(0.0), vec2(0.9999));
     float depth = texelFetch(DepthSampler, ivec2(clamped * DepthSize), 0).r;
-    if (depth >= 0.99999) {
+    if (depth <= 0.00001) {
         return vec3(1.0e6);
     }
     vec2 ndc = clamped * 2.0 - 1.0;

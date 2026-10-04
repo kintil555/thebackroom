@@ -27,8 +27,8 @@ float depOccOpenAt(sampler2D depthTex, vec2 depthSize, mat4 inverseMatrix, bool 
                    vec3 center, vec3 normal, float radius, vec2 uv) {
     vec2 clamped = clamp(uv, vec2(0.0), vec2(0.9999));
     float depth = texelFetch(depthTex, ivec2(clamped * depthSize), 0).r;
-    if (depth >= 0.99999) {
-        return 1.0; // langit: tidak ada yang menutupi
+    if (depth <= 0.00001) {
+        return 1.0; // langit (depth reverse-Z: langit = 0, dekat = 1): tidak ada yang menutupi
     }
     vec2 ndc = clamped * 2.0 - 1.0;
     float ndcZ = zeroToOne ? depth : depth * 2.0 - 1.0;

@@ -4,6 +4,7 @@ import com.backrooms.client.glow.PortalDistortRenderer;
 import com.backrooms.client.glow.PortalGlowRenderer;
 import com.backrooms.client.light.ColoredLightRenderer;
 import com.backrooms.client.light.LampBloomRenderer;
+import com.backrooms.client.postfx.WorldDepth;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.resource.CrossFrameResourcePool;
 import net.minecraft.client.DeltaTracker;
@@ -28,9 +29,17 @@ public abstract class GameRendererGlowMixin {
 	@Final
 	private CrossFrameResourcePool resourcePool;
 
+	/** Vanilla meng-clear depth main untuk tangan setelah dunia tergambar; salin depth dunia dulu agar post effect bisa mengoklusi. */
+	@Inject(method = "renderLevel", at = @At(value = "INVOKE",
+		target = "Lcom/mojang/blaze3d/systems/CommandEncoder;clearDepthTexture(Lcom/mojang/blaze3d/textures/GpuTexture;D)V"))
+	private void backrooms$captureWorldDepth(DeltaTracker deltaTracker, CallbackInfo ci) {
+		WorldDepth.capture(this.mainRenderTarget);
+	}
+
 	@Inject(method = "render", at = @At(value = "INVOKE",
 		target = "Lnet/minecraft/client/renderer/LevelRenderer;doEntityOutline()V", shift = At.Shift.AFTER))
 	private void backrooms$portalGlow(DeltaTracker deltaTracker, boolean advanceGameTime, CallbackInfo ci) {
+		WorldDepth.restore(this.mainRenderTarget);
 		// Cahaya berwarna lebih dulu agar bloom portal tergambar di atasnya.
 		ColoredLightRenderer.render(this.mainRenderTarget, this.resourcePool, deltaTracker);
 		LampBloomRenderer.render(this.mainRenderTarget, this.resourcePool, deltaTracker);
