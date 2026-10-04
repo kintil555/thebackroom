@@ -20,7 +20,7 @@ final class PortalSparks {
 	/** Partikel per tick: ambient awal, ambient puncak, dan semburan burst. */
 	private static final float AMBIENT_MIN = 0.35f;
 	private static final float AMBIENT_MAX = 3.5f;
-	private static final float BURST_RATE = 26.0f;
+	private static final float BURST_RATE = 70.0f;
 	/** Semburan masih berlanjut sebanyak ini setelah portal terbuka, menurun sampai nol. */
 	private static final int BURST_TAIL_TICKS = 30;
 	/** Burst membesar penuh dalam fraksi durasi ini sejak BURST_START_FRACTION (sekitar 4 tick). */
@@ -116,11 +116,11 @@ final class PortalSparks {
 		double dv = random.nextGaussian() * 0.8;
 		double dw = side * (0.5 + random.nextDouble());
 		double length = Math.sqrt(du * du + dv * dv + dw * dw);
-		double speed = (0.3 + random.nextDouble() * 0.7) / Math.max(length, 1.0e-4);
+		double speed = (0.5 + random.nextDouble() * 1.1) / Math.max(length, 1.0e-4);
 		du *= speed;
 		dv *= speed;
 		dw *= speed;
-		level.addParticle(ModParticles.ELECTRIC_SPARK,
+		level.addParticle(ModParticles.ELECTRIC_SPARK_BURST,
 			frame.x(u, 0.0), frame.y(v), frame.z(u, 0.0),
 			frame.x(du, dw) - frame.cx, dv, frame.z(du, dw) - frame.cz);
 	}

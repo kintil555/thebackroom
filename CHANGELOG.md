@@ -25,3 +25,7 @@
 - Item hasil pick (middle click) blok berlapis: ikon inventaris, hotbar, dan tangan kini ikut menampilkan tekstur Wallpaper/Carpet di sisi yang berlapis. Screw Piles lewat item model JSON (composite + select block_state), blok lain lewat mixin ItemModelResolver
 - Fix: debu saat berlari di atas sisi atas berlapis melesat cepat ke atas. Kini memakai partikel BLOCK (model cover_display) agar kecepatannya dinormalkan seperti vanilla
 - Portal: glow/bloom cerah berkedip di tengah bingkai Magnet selama 10 detik pengisian energi, sebelum portal terbuka. Postfx lewat PostChain: satu chain statis dengan tekstur data dinamis (posisi layar, radius, intensitas, warna) yang ditulis ulang tiap frame, karena uniform PostPass di 26.2 tidak bisa diubah setelah chain dibuat. Kedip: puncak tinggi, meredup sedikit, tinggi lagi sedikit lebih rendah; makin terang menjelang portal terbuka. Glow memudar halus bila tengah portal terhalang blok. Server mengirim PortalChargePayload saat Magnet mulai ACTIVE
+- Portal burst: ruangan di luar bloom menggelap (efek exposure) saat bloom besar dan terang; bloom sendiri tetap terang
+- Portal: pemain dalam 12 blok saat portal terbuka terkena efek flashbang (putih memudar, bayangan sisa di layar, blur dan gambar ganda)
+- Portal: bloom memancarkan cahaya ke sekitar (post effect cahaya berwarna), jangkauan dan terangnya mengikuti ukuran bloom, tanpa perlu LambDynamicLights
+- Partikel listrik: tipe baru electric_spark_burst, lebih besar dan lebih kuat, menyembur saat bloom state burst

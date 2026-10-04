@@ -2,6 +2,7 @@ package com.backrooms.client.glow;
 
 import com.backrooms.ModBlocks;
 import com.backrooms.block.MagnetFrame;
+import com.backrooms.client.light.ColoredLights;
 import com.backrooms.network.PortalChargePayload;
 import net.minecraft.core.Direction;
 import net.minecraft.util.Mth;
@@ -10,7 +11,9 @@ import java.util.Iterator;
 import java.util.List;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.phys.Vec3;
 import org.jspecify.annotations.Nullable;
@@ -26,6 +29,16 @@ public final class PortalGlowManager {
 	public static final int AFTER_OPEN_TICKS = 260;
 	/** Toleransi menunggu paket blok portal tiba setelah durasi pengisian habis. */
 	private static final int OPEN_GRACE_TICKS = 40;
+
+	/** Cahaya yang dipancarkan bloom ke sekitar (post effect cahaya berwarna): warna kuning kehijauan, jangkauan dalam blok. */
+	private static final float LIGHT_START_RADIUS = 4.0f;
+	private static final float LIGHT_MAX_RADIUS = 26.0f;
+	private static final float LIGHT_END_RADIUS = 3.0f;
+	private static final float LIGHT_RED = 0.89f;
+	private static final float LIGHT_GREEN = 1.0f;
+	private static final float LIGHT_BLUE = 0.47f;
+	/** Seberapa banyak cahaya portal menerangi permukaan (bukan sekadar mewarnai); 0..1, lihat colored_light.fsh. */
+	private static final float LIGHT_EMISSION = 1.0f;
 
 	private static final List<Source> SOURCES = new ArrayList<>();
 
@@ -60,14 +73,24 @@ public final class PortalGlowManager {
 		}
 
 		/** Tingkat cahaya dinamis 0..15: mengikuti kurva bloom (naik pelan, melonjak saat burst, meredup setelah terbuka). */
-		float lightLevel(long now) {
+		float lightLevel(double now) {
 			float flicker = 0.7f + 0.3f * Mth.clamp(PortalGlowFlicker.value(now / 20.0, this.seed), 0.0f, 1.0f);
 			if (this.openedTick >= 0L) {
-				float decay = PortalGlowFlicker.smooth(PortalGlowRenderer.GLOW_DECAY_TICKS, (float) Math.max(0L, now - this.openedTick));
+				float decay = PortalGlowFlicker.smooth(PortalGlowRenderer.GLOW_DECAY_TICKS, (float) Math.max(0.0, now - this.openedTick));
 				return 15.0f * (1.0f - decay) * Mth.lerp(decay, flicker, 1.0f);
 			}
-			float progress = Mth.clamp((float) (now - this.startTick) / this.durationTicks, 0.0f, 1.0f);
+			float progress = Mth.clamp((float) ((now - this.startTick) / this.durationTicks), 0.0f, 1.0f);
 			return 15.0f * PortalGlowRenderer.riseLevel(progress) * flicker;
+		}
+
+		/** Jangkauan cahaya (blok): tumbuh bersama bloom (kecil saat awal, lebar saat burst) dan mengecil setelah portal terbuka. */
+		float lightRadius(double now) {
+			if (this.openedTick >= 0L) {
+				float decay = PortalGlowFlicker.smooth(PortalGlowRenderer.GLOW_DECAY_TICKS, (float) Math.max(0.0, now - this.openedTick));
+				return Mth.lerp(decay, LIGHT_MAX_RADIUS, LIGHT_END_RADIUS);
+			}
+			float progress = Mth.clamp((float) ((now - this.startTick) / this.durationTicks), 0.0f, 1.0f);
+			return Mth.lerp(PortalGlowRenderer.riseLevel(progress), LIGHT_START_RADIUS, LIGHT_MAX_RADIUS);
 		}
 	}
 
@@ -89,6 +112,22 @@ public final class PortalGlowManager {
 			}
 		}
 		return points;
+	}
+
+	/** Cahaya berwarna portal untuk post effect {@link ColoredLights}; ukuran dan terangnya mengikuti kurva bloom. */
+	public static List<ColoredLights.Sample> colorSamples(double nowTicks) {
+		if (SOURCES.isEmpty()) {
+			return List.of();
+		}
+		List<ColoredLights.Sample> samples = new ArrayList<>(SOURCES.size());
+		for (Source source : SOURCES) {
+			float intensity = Math.min(1.0f, source.lightLevel(nowTicks) / 15.0f);
+			if (intensity > 0.003f) {
+				samples.add(new ColoredLights.Sample(Vec3.atCenterOf(source.center),
+					LIGHT_RED, LIGHT_GREEN, LIGHT_BLUE, source.lightRadius(nowTicks), intensity, LIGHT_EMISSION));
+			}
+		}
+		return samples;
 	}
 
 	public static void init() {
@@ -126,6 +165,7 @@ public final class PortalGlowManager {
 		if (level == null) {
 			SOURCES.forEach(source -> source.sounds.stop());
 			SOURCES.clear();
+			PortalFlash.reset();
 			return;
 		}
 		long now = level.getGameTime();
@@ -134,6 +174,10 @@ public final class PortalGlowManager {
 			Source source = iterator.next();
 			if (source.openedTick < 0L && level.getBlockState(source.center).is(ModBlocks.PLACEHOLDER_PORTAL)) {
 				source.openedTick = now;
+				LocalPlayer player = Minecraft.getInstance().player;
+				if (player != null) {
+					PortalFlash.onOpened(level, player, source);
+				}
 			}
 			source.sounds.tick(now - source.startTick, source.openedTick < 0L ? -1L : now - source.openedTick);
 			PortalSparks.tick(level, source, now);

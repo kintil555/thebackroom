@@ -28,6 +28,7 @@ import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
+import org.joml.Vector3fc;
 import org.joml.Vector4f;
 
 /**
@@ -41,8 +42,10 @@ import org.joml.Vector4f;
 public final class PortalGlowRenderer {
 	private static final int MAX_SOURCES = 4;
 	private static final int DATA_WIDTH = 3;
-	/** Baris terakhir tekstur data = parameter efek kamera (warp/blur), bukan sumber glow. */
-	private static final int DATA_HEIGHT = MAX_SOURCES + 1;
+	/** Baris setelah sumber: parameter efek kamera (warp/blur, exposure, flashbang), lalu posisi bayangan sisa flashbang. */
+	private static final int ROW_CAMERA = MAX_SOURCES;
+	private static final int ROW_FLASH = MAX_SOURCES + 1;
+	private static final int DATA_HEIGHT = MAX_SOURCES + 2;
 
 	/** Tempat tekstur data didaftarkan. PostChain me-resolve input tekstur ke {@code textures/effect/<path>.png}. */
 	private static final Identifier DATA_TEXTURE_ID = Identifier.fromNamespaceAndPath(BackroomsMod.MOD_ID, "textures/effect/portal_glow_data.png");
@@ -67,6 +70,15 @@ public final class PortalGlowRenderer {
 	private static final float FADE_IN_TICKS = 8.0f;
 	// Efek kamera (distorsi + blur) di dekat portal.
 	private static final float WARP_RANGE_BLOCKS = 7.0f;
+	// Exposure: saat bloom besar dan terang, ruangan di luar bloom terlihat lebih gelap (kekuatan maksimum di portal_glow.fsh).
+	/** Tingkat bloom (0..1) saat ruangan mulai menggelap; di bawah ini (fase isi pelan) tidak ada efek. */
+	private static final float EXPOSURE_START_LEVEL = 0.15f;
+	/** Di luar jarak 1.15x radius bloom (minimal ini) tidak ada efek; penuh di dalam 0.35x. */
+	private static final float EXPOSURE_MIN_REACH_BLOCKS = 8.0f;
+	/** Menghadap jauh dari bloom tetap menggelap sedikit (porsi dari penuh). */
+	private static final float EXPOSURE_BACK_FACTOR = 0.25f;
+	/** Radius bayangan sisa flashbang (blok di posisi portal, diproyeksikan ke layar saat flash terjadi). */
+	private static final float GHOST_RADIUS_BLOCKS = 5.0f;
 	/** Warna tengah glow (kuning kehijauan). Inti memutih dan tepi lebih hijau; gradiennya dihitung di portal_glow.fsh. */
 	private static final int TINT_R = 226;
 	private static final int TINT_G = 255;
@@ -101,7 +113,12 @@ public final class PortalGlowRenderer {
 		ClientLevel level = minecraft.level;
 		LocalPlayer player = minecraft.player;
 		List<PortalGlowManager.Source> sources = PortalGlowManager.sources();
-		if (sources.isEmpty() || level == null || player == null || failed) {
+		if (level == null || player == null || failed) {
+			lastFrameNanos = 0L;
+			return;
+		}
+		double nowTicks = level.getGameTime() + deltaTracker.getGameTimeDeltaPartialTick(false);
+		if (sources.isEmpty() && !PortalFlash.active(nowTicks)) {
 			lastFrameNanos = 0L;
 			return;
 		}
@@ -110,24 +127,31 @@ public final class PortalGlowRenderer {
 		float frameSeconds = lastFrameNanos == 0L ? 0.016f : Math.min(0.1f, (nowNanos - lastFrameNanos) / 1.0e9f);
 		lastFrameNanos = nowNanos;
 
-		double nowTicks = level.getGameTime() + deltaTracker.getGameTimeDeltaPartialTick(false);
 		Camera camera = minecraft.gameRenderer.mainCamera();
+		if (PortalFlash.needsCapture()) {
+			captureGhost(camera, main.width, main.height);
+		}
 		List<Glow> glows = new ArrayList<>(sources.size());
 		float warp = 0.0f;
+		float dark = 0.0f;
 		for (PortalGlowManager.Source source : sources) {
 			Glow glow = evaluate(source, level, player, camera, nowTicks, frameSeconds, main.width, main.height);
 			if (glow != null) {
 				glows.add(glow);
 			}
 			warp = Math.max(warp, warpAmount(source, camera, nowTicks));
+			dark = Math.max(dark, exposureAmount(source, camera, nowTicks));
 		}
-		if ((glows.isEmpty() && warp <= 0.001f) || !ensureResources(minecraft)) {
+		float flashWhite = PortalFlash.white(nowTicks);
+		float ghost = PortalFlash.ghost(nowTicks);
+		boolean idle = glows.isEmpty() && warp <= 0.001f && dark <= 0.001f && flashWhite <= 0.001f && ghost <= 0.001f;
+		if (idle || !ensureResources(minecraft)) {
 			return;
 		}
 
 		// Yang paling dekat (radius layar terbesar) lebih dulu: hanya MAX_SOURCES baris yang muat di tekstur data.
 		glows.sort(Comparator.comparingDouble(Glow::radius).reversed());
-		writeData(glows, warp, (float) (nowTicks / 80.0 % 1.0));
+		writeData(glows, warp, (float) (nowTicks / 80.0 % 1.0), dark, flashWhite, ghost);
 		chain.process(main, pool);
 	}
 
@@ -208,6 +232,59 @@ public final class PortalGlowRenderer {
 		return time * near * near * (3.0f - 2.0f * near);
 	}
 
+	/**
+	 * Seberapa gelap ruangan di luar bloom 0..1 (efek exposure kamera, seperti menyorot api korek di siang hari: latar
+	 * jadi gelap sementara sumber cahaya tetap terang). Naik bersama tingkat bloom, jadi baru terasa saat bloom besar
+	 * dan terang; mengikuti jangkauan bloom, arah pandang, dan keterlihatan portal.
+	 */
+	private static float exposureAmount(PortalGlowManager.Source source, Camera camera, double nowTicks) {
+		float level;
+		float radiusBlocks;
+		if (source.openedTick < 0L) {
+			float progress = Mth.clamp((float) ((nowTicks - source.startTick) / source.durationTicks), 0.0f, 1.0f);
+			float rise = riseLevel(progress);
+			level = PortalGlowFlicker.smooth(1.0f - EXPOSURE_START_LEVEL, rise - EXPOSURE_START_LEVEL);
+			radiusBlocks = Mth.lerp(rise, START_RADIUS_BLOCKS, PEAK_RADIUS_BLOCKS);
+		} else {
+			float decay = PortalGlowFlicker.smooth(GLOW_DECAY_TICKS, (float) Math.max(0.0, nowTicks - source.openedTick));
+			level = 1.0f - decay;
+			radiusBlocks = Mth.lerp(decay, PEAK_RADIUS_BLOCKS, END_RADIUS_BLOCKS);
+		}
+		if (level <= 0.0f) {
+			return 0.0f;
+		}
+		// Napas kedipan bloom ikut terasa di exposure, tetapi redam agar layar tidak berkedip kasar.
+		float flicker = Mth.clamp(PortalGlowFlicker.value(nowTicks / 20.0, source.seed), 0.0f, 1.0f);
+		level *= 0.85f + 0.15f * flicker;
+
+		Vec3 eye = camera.position();
+		Vec3 toTarget = Vec3.atCenterOf(source.center).subtract(eye);
+		float distance = (float) toTarget.length();
+		float reach = Math.max(radiusBlocks, EXPOSURE_MIN_REACH_BLOCKS);
+		float proximity = 1.0f - PortalGlowFlicker.smooth(0.8f * reach, distance - 0.35f * reach);
+
+		// Menghadap bloom = penuh; membelakangi = tetap sedikit. Di dekat titik portal arah tidak lagi dipakai.
+		Vector3fc forward = camera.forwardVector();
+		float dot = distance > 1.0e-3f
+			? (float) (forward.x() * toTarget.x + forward.y() * toTarget.y + forward.z() * toTarget.z) / distance
+			: 1.0f;
+		float facing = PortalGlowFlicker.smooth(0.9f, dot + 0.3f);
+		facing = Mth.lerp(PortalGlowFlicker.smooth(2.0f, distance), 1.0f, facing);
+		float view = Mth.lerp(facing, EXPOSURE_BACK_FACTOR, 1.0f);
+
+		return level * proximity * view * source.visibility;
+	}
+
+	/** Menyimpan posisi layar tempat bloom terlihat saat flash terjadi; bayangan sisa tertinggal di sana (tetap di layar, tidak ikut kamera). */
+	private static void captureGhost(Camera camera, int width, int height) {
+		float[] projected = project(camera, PortalFlash.target(), GHOST_RADIUS_BLOCKS, width, height);
+		if (projected == null) {
+			PortalFlash.setGhost(0.0f, 0.0f, 0.0f);
+			return;
+		}
+		PortalFlash.setGhost(projected[0] / width, projected[1] / height, Mth.clamp(projected[2] / height, 0.12f, 0.6f));
+	}
+
 	/** Proyeksi titik dunia ke piksel layar (asal kiri-atas) beserta radius piksel pada kedalaman itu; null jika di luar pandangan. */
 	private static float[] project(Camera camera, Vec3 target, float radiusBlocks, int width, int height) {
 		Vec3 eye = camera.position();
@@ -227,7 +304,7 @@ public final class PortalGlowRenderer {
 		return new float[] {px, py, radius};
 	}
 
-	private static void writeData(List<Glow> glows, float warp, float phase) {
+	private static void writeData(List<Glow> glows, float warp, float phase, float dark, float flashWhite, float ghost) {
 		NativeImage image = dataTexture.getPixels();
 		for (int row = 0; row < MAX_SOURCES; row++) {
 			if (row >= glows.size()) {
@@ -246,12 +323,22 @@ public final class PortalGlowRenderer {
 			// Alpha texel 2 = spread (8 bit).
 			image.setPixelABGR(2, row, abgr(TINT_R, TINT_G, TINT_B, Math.round(Mth.clamp(glow.spread(), 0.0f, 1.0f) * 255.0f)));
 		}
-		// Baris parameter kamera: texel 0 = warp (16 bit) + blur (16 bit), texel 1 = fase waktu 0..1 (16 bit).
+		// Baris parameter kamera: texel 0 = warp (16 bit) + blur (16 bit), texel 1 = fase waktu 0..1 (16 bit),
+		// texel 2 = r,g exposure/gelap (16 bit), b = putih flashbang (8 bit), a = bayangan sisa flashbang (8 bit).
 		int warpBits = encode16(warp);
 		int phaseBits = encode16(phase);
-		image.setPixelABGR(0, MAX_SOURCES, abgr(warpBits >> 8, warpBits & 0xFF, warpBits >> 8, warpBits & 0xFF));
-		image.setPixelABGR(1, MAX_SOURCES, abgr(phaseBits >> 8, phaseBits & 0xFF, 0, 255));
-		image.setPixelABGR(2, MAX_SOURCES, 0);
+		int darkBits = encode16(dark);
+		image.setPixelABGR(0, ROW_CAMERA, abgr(warpBits >> 8, warpBits & 0xFF, warpBits >> 8, warpBits & 0xFF));
+		image.setPixelABGR(1, ROW_CAMERA, abgr(phaseBits >> 8, phaseBits & 0xFF, 0, 255));
+		image.setPixelABGR(2, ROW_CAMERA, abgr(darkBits >> 8, darkBits & 0xFF,
+			Math.round(Mth.clamp(flashWhite, 0.0f, 1.0f) * 255.0f), Math.round(Mth.clamp(ghost, 0.0f, 1.0f) * 255.0f)));
+		// Baris flashbang: posisi layar bayangan sisa (kodenya sama dengan baris sumber) dan radiusnya.
+		int ghostX = encode16((PortalFlash.ghostX() + 0.5f) / 2.0f);
+		int ghostY = encode16((PortalFlash.ghostY() + 0.5f) / 2.0f);
+		int ghostRadius = encode16(PortalFlash.ghostRadius() / 2.0f);
+		image.setPixelABGR(0, ROW_FLASH, abgr(ghostX >> 8, ghostX & 0xFF, ghostY >> 8, ghostY & 0xFF));
+		image.setPixelABGR(1, ROW_FLASH, abgr(ghostRadius >> 8, ghostRadius & 0xFF, 0, 0));
+		image.setPixelABGR(2, ROW_FLASH, 0);
 		dataTexture.upload();
 	}
 

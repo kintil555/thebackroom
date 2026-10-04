@@ -37,7 +37,7 @@ import org.joml.Vector4f;
  *   <li>baris 0: 16 texel = invers matriks (proyeksi * rotasi view), urutan kolom GLSL;</li>
  *   <li>baris 1, texel 0: 1.0 jika depth device zero-to-one, 0.0 jika -1..1;</li>
  *   <li>baris 2..: satu cahaya per baris. Texel 0..2 = posisi relatif kamera (xyz), texel 3 = radius,
- *       texel 4 = r,g,b = warna dan a = intensitas (8 bit).</li>
+ *       texel 4 = r,g,b = warna dan a = intensitas (8 bit), texel 5 = r emisi (8 bit).</li>
  * </ul>
  */
 public final class ColoredLightRenderer {
@@ -126,6 +126,7 @@ public final class ColoredLightRenderer {
 			image.setPixelABGR(2, y, Float.floatToRawIntBits((float) relative.z));
 			image.setPixelABGR(3, y, Float.floatToRawIntBits(light.radius()));
 			image.setPixelABGR(4, y, abgr(light.red(), light.green(), light.blue(), light.intensity()));
+			image.setPixelABGR(5, y, abgr(light.emission(), 0.0f, 0.0f, 0.0f));
 		}
 		dataTexture.upload();
 	}

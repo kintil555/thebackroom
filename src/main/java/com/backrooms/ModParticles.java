@@ -10,10 +10,15 @@ public final class ModParticles {
 	public static final SimpleParticleType ELECTRIC_SPARK = new SimpleParticleType(false) {
 	};
 
+	/** Versi besar dan kuat untuk semburan saat bloom burst; tekstur sama, ukuran dan jangkauan lebih besar. */
+	public static final SimpleParticleType ELECTRIC_SPARK_BURST = new SimpleParticleType(false) {
+	};
+
 	private ModParticles() {
 	}
 
 	public static void init() {
 		Registry.register(BuiltInRegistries.PARTICLE_TYPE, Identifier.fromNamespaceAndPath(BackroomsMod.MOD_ID, "electric_spark"), ELECTRIC_SPARK);
+		Registry.register(BuiltInRegistries.PARTICLE_TYPE, Identifier.fromNamespaceAndPath(BackroomsMod.MOD_ID, "electric_spark_burst"), ELECTRIC_SPARK_BURST);
 	}
 }

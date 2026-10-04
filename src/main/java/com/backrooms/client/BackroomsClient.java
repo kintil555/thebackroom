@@ -17,7 +17,8 @@ public class BackroomsClient implements ClientModInitializer {
 	public void onInitializeClient() {
 		ClientCovers.init();
 		PortalGlowManager.init();
-		ParticleProviderRegistry.getInstance().register(ModParticles.ELECTRIC_SPARK, ElectricSparkParticle.Provider::new);
+		ParticleProviderRegistry.getInstance().register(ModParticles.ELECTRIC_SPARK, sprites -> new ElectricSparkParticle.Provider(sprites, false));
+		ParticleProviderRegistry.getInstance().register(ModParticles.ELECTRIC_SPARK_BURST, sprites -> new ElectricSparkParticle.Provider(sprites, true));
 		BlockEntityRenderers.register(ModBlockEntities.SIREN, SirenRenderer::new);
 
 		// Bungkus model semua blok biasa agar carpet (attachment chunk) ikut tergambar. Screw Piles menggambar

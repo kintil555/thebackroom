@@ -8,7 +8,8 @@
 //   baris 0: 16 texel = matriks invers, urutan kolom GLSL
 //   baris 1, texel 0: 1.0 jika depth zero-to-one, 0.0 jika -1..1
 //   baris 2..9: satu cahaya per baris.
-//     texel 0..2 = posisi relatif kamera, texel 3 = radius (blok), texel 4 = r,g,b warna dan a = intensitas (8 bit)
+//     texel 0..2 = posisi relatif kamera, texel 3 = radius (blok), texel 4 = r,g,b warna dan a = intensitas (8 bit),
+//     texel 5 = r emisi 0..1 (0 = hanya tint seperti sirine, 1 = menerangi permukaan seperti sumber cahaya)
 // Urutan SamplerInfo mengikuti urutan input chain: In, Depth, Data.
 uniform sampler2D InSampler;
 uniform sampler2D DepthSampler;
@@ -31,6 +32,8 @@ const int FIRST_LIGHT_ROW = 2;
 const float STRENGTH = 0.95;
 // Pengali warna sumber: >1 mengangkat kanal dominan, sisanya ditekan sehingga hasilnya merah, bukan merah muda.
 const float COLOR_GAIN = 1.7;
+// Tambahan terang untuk sumber beremisi penuh (portal): permukaan dekat bloom ikut menyala, bukan hanya berwarna.
+const float EMISSIVE_ADD = 0.5;
 
 float fetchFloat(int x, int y) {
     vec4 c = texelFetch(DataSampler, ivec2(x, y), 0);
@@ -85,7 +88,8 @@ void main() {
         float amount = clamp(falloff * facing * intensity * STRENGTH, 0.0, 1.0);
         vec3 tint = colorData.rgb * COLOR_GAIN + 0.03;
         multiplier *= mix(vec3(1.0), tint, amount);
-        additive += colorData.rgb * amount * 0.05;
+        float emission = texelFetch(DataSampler, ivec2(5, row), 0).r;
+        additive += colorData.rgb * amount * mix(0.05, EMISSIVE_ADD, emission);
     }
 
     fragColor = vec4(scene * multiplier + additive, 1.0);

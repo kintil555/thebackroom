@@ -1,6 +1,7 @@
 package com.backrooms.client.light;
 
 import com.backrooms.block.SirenBlock;
+import com.backrooms.client.glow.PortalGlowManager;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -46,8 +47,11 @@ public final class ColoredLights {
 		}
 	}
 
-	/** Satu cahaya siap gambar: posisi dunia, warna 0..1, radius (blok), dan intensitas 0..1. */
-	public record Sample(Vec3 position, float red, float green, float blue, float radius, float intensity) {
+	/**
+	 * Satu cahaya siap gambar: posisi dunia, warna 0..1, radius (blok), intensitas 0..1, dan emisi 0..1
+	 * (0 = hanya mewarnai permukaan seperti sirine, 1 = ikut menerangi permukaan seperti sumber cahaya).
+	 */
+	public record Sample(Vec3 position, float red, float green, float blue, float radius, float intensity, float emission) {
 	}
 
 	/** Dipanggil tiap tick client oleh ticker block entity sirine; hanya sirine aktif yang tercatat. */
@@ -72,10 +76,10 @@ public final class ColoredLights {
 
 	/** Cahaya yang aktif saat ini ({@code nowTicks} = game time + partial tick). Membuang sumber yang sudah padam. */
 	static List<Sample> samples(double nowTicks) {
+		List<Sample> samples = new ArrayList<>(PortalGlowManager.colorSamples(nowTicks));
 		if (SIRENS.isEmpty()) {
-			return List.of();
+			return samples;
 		}
-		List<Sample> samples = new ArrayList<>(SIRENS.size());
 		Iterator<Entry> iterator = SIRENS.values().iterator();
 		float red = ((SIREN_RGB >> 16) & 0xFF) / 255.0f;
 		float green = ((SIREN_RGB >> 8) & 0xFF) / 255.0f;
@@ -90,7 +94,7 @@ public final class ColoredLights {
 			float since = (float) (nowTicks - entry.lastSeen);
 			float fadeOut = 1.0f - Mth.clamp((since - 1.5f) / FADE_OUT_TICKS, 0.0f, 1.0f);
 			float pulse = 0.6f + 0.4f * (0.5f + 0.5f * (float) Math.cos(nowTicks * (Math.PI * 2.0 / PULSE_PERIOD_TICKS)));
-			samples.add(new Sample(entry.position, red, green, blue, SIREN_RADIUS_BLOCKS, fadeIn * fadeOut * pulse));
+			samples.add(new Sample(entry.position, red, green, blue, SIREN_RADIUS_BLOCKS, fadeIn * fadeOut * pulse, 0.0f));
 		}
 		return samples;
 	}

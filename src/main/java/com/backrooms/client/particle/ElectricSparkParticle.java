@@ -21,17 +21,24 @@ public class ElectricSparkParticle extends SingleQuadParticle {
 	private final SpriteSet sprites;
 	private final int frameOffset;
 
-	private ElectricSparkParticle(ClientLevel level, double x, double y, double z, double xa, double ya, double za, SpriteSet sprites) {
+	private ElectricSparkParticle(ClientLevel level, double x, double y, double z, double xa, double ya, double za, SpriteSet sprites, boolean burst) {
 		super(level, x, y, z, sprites.first());
 		this.sprites = sprites;
 		this.xd = xa;
 		this.yd = ya;
 		this.zd = za;
-		this.friction = 0.86F;
 		this.gravity = 0.0F;
 		this.hasPhysics = false;
-		this.quadSize = 0.14F + this.random.nextFloat() * 0.16F;
-		this.lifetime = 6 + this.random.nextInt(8);
+		if (burst) {
+			// Semburan burst: jauh lebih besar (sesekali sangat besar), melaju lebih jauh, hidup sedikit lebih lama.
+			this.friction = 0.90F;
+			this.quadSize = this.random.nextFloat() < 0.15F ? 1.1F + this.random.nextFloat() * 0.6F : 0.45F + this.random.nextFloat() * 0.45F;
+			this.lifetime = 9 + this.random.nextInt(10);
+		} else {
+			this.friction = 0.86F;
+			this.quadSize = 0.14F + this.random.nextFloat() * 0.16F;
+			this.lifetime = 6 + this.random.nextInt(8);
+		}
 		this.frameOffset = this.random.nextInt(FRAMES);
 		this.applyFrame();
 	}
@@ -68,14 +75,16 @@ public class ElectricSparkParticle extends SingleQuadParticle {
 
 	public static class Provider implements ParticleProvider<SimpleParticleType> {
 		private final SpriteSet sprites;
+		private final boolean burst;
 
-		public Provider(SpriteSet sprites) {
+		public Provider(SpriteSet sprites, boolean burst) {
 			this.sprites = sprites;
+			this.burst = burst;
 		}
 
 		@Override
 		public Particle createParticle(SimpleParticleType options, ClientLevel level, double x, double y, double z, double xAux, double yAux, double zAux, RandomSource random) {
-			return new ElectricSparkParticle(level, x, y, z, xAux, yAux, zAux, this.sprites);
+			return new ElectricSparkParticle(level, x, y, z, xAux, yAux, zAux, this.sprites, this.burst);
 		}
 	}
 }
