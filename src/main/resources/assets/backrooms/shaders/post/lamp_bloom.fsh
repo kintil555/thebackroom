@@ -1,15 +1,15 @@
 #version 330
 
-// Bloom Lamp lewat post effect. Tiap Lamp menyala = kotak 1 blok (setengah sisi 0.5) yang bloomnya meluas RADIUS blok di
-// luar tepinya. Untuk tiap piksel, sinar kamera dicari titik terdekatnya ke kotak (pencarian terner, sdBox cembung)
-// hanya sampai permukaan yang terlihat di piksel itu, jadi bagian Lamp yang tertutup dinding tidak membloom, tetapi
-// udara dan permukaan di sekitar Lamp yang terlihat ikut berpendar. Posisi dunia (relatif kamera) direkonstruksi dari
-// depth buffer, sama seperti colored_light.fsh.
+// Bloom Lamp berbasis layar (screen-space), mengikuti pendekatan Shine: glow dihitung dari jarak 2D di layar ke Lamp
+// yang diproyeksikan, bukan dari jarak 3D ke kotak. Keterlihatan Lamp diukur per piksel dengan mengambil sampel depth
+// buffer di sekitar Lamp: bagian yang tertutup blok (dinding, lantai, langit-langit) tidak dihitung, jadi Lamp yang
+// sepenuhnya di balik blok tidak membloom sama sekali dan Lamp yang separuh tertutup membloom separuh.
 //
-// Tata letak DataSampler (16 x 18, float disimpan sebagai 4 byte IEEE per texel, byte rendah di kanal r):
+// Tata letak DataSampler (16 x 19, float disimpan sebagai 4 byte IEEE per texel, byte rendah di kanal r):
 //   baris 0: 16 texel = matriks invers (proyeksi * rotasi view), urutan kolom GLSL
 //   baris 1: texel 0 = 1.0 jika depth zero-to-one, texel 1 = radius bloom (blok)
-//   baris 2..17: satu Lamp per baris. Texel 0..2 = pusat relatif kamera, texel 3 = r,g,b warna dan a = kekuatan 0..1 (8 bit)
+//   baris 2: 16 texel = matriks maju (proyeksi * rotasi view), urutan kolom GLSL
+//   baris 3..18: satu Lamp per baris. Texel 0..2 = pusat relatif kamera, texel 3 = r,g,b warna dan a = kekuatan 0..1
 // Urutan SamplerInfo mengikuti urutan input chain: In, Depth, Data.
 uniform sampler2D InSampler;
 uniform sampler2D DepthSampler;
@@ -27,17 +27,15 @@ in vec2 texCoord;
 out vec4 fragColor;
 
 const int MAX_LAMPS = 16;
-const int FIRST_LAMP_ROW = 2;
+const int FIRST_LAMP_ROW = 3;
 const float HALF_SIZE = 0.5;
-// Setengah diagonal kubus: sinar yang lebih jauh dari ini (ditambah radius) dari pusat tidak mungkin menyentuh bloom.
-const float HALF_DIAGONAL = 0.8660254;
-// Kecerahan halo tepat di luar tepi kotak; menurun halus sampai 0 pada jarak RADIUS.
-const float PEAK = 0.28;
-// Di dalam kotak (permukaan Lamp itu sendiri, yang sudah terang) hanya ditambah sebagian kecil agar teksturnya tidak terbakar putih.
-const float CORE_SCALE = 0.3;
-// Seberapa jauh halo memutih (0 = murni warna tekstur, 1 = putih).
+// Kecerahan halo tepat di luar tepi Lamp; menurun halus sampai 0 pada jarak RADIUS.
+const float PEAK = 0.34;
+// Di atas permukaan Lamp itu sendiri (sudah terang) hanya ditambah sebagian kecil agar teksturnya tidak terbakar putih.
+const float CORE_SCALE = 0.35;
 const float WHITE_CORE = 0.12;
-const int SEARCH_STEPS = 12;
+// Jarak sampel keterlihatan dari pusat Lamp (blok, pada bidang tegak lurus pandangan).
+const float SAMPLE_OFFSET = 0.4;
 
 float fetchFloat(int x, int y) {
     vec4 c = texelFetch(DataSampler, ivec2(x, y), 0);
@@ -45,39 +43,38 @@ float fetchFloat(int x, int y) {
     return uintBitsToFloat(b.r | (b.g << 8u) | (b.b << 16u) | (b.a << 24u));
 }
 
-// Jarak bertanda ke kotak 1 blok berpusat di titik asal.
-float sdBox(vec3 p) {
-    vec3 q = abs(p) - vec3(HALF_SIZE);
-    return length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0);
+mat4 fetchMatrix(int row) {
+    return mat4(
+        fetchFloat(0, row), fetchFloat(1, row), fetchFloat(2, row), fetchFloat(3, row),
+        fetchFloat(4, row), fetchFloat(5, row), fetchFloat(6, row), fetchFloat(7, row),
+        fetchFloat(8, row), fetchFloat(9, row), fetchFloat(10, row), fetchFloat(11, row),
+        fetchFloat(12, row), fetchFloat(13, row), fetchFloat(14, row), fetchFloat(15, row));
+}
+
+// Jarak dari kamera ke permukaan terlihat pada koordinat layar uv (langit/tak terhingga = sangat jauh).
+float sceneDistanceAt(vec2 uv, mat4 inverseMatrix, bool zeroToOne) {
+    vec2 clamped = clamp(uv, vec2(0.0), vec2(0.9999));
+    float depth = texelFetch(DepthSampler, ivec2(clamped * DepthSize), 0).r;
+    if (depth >= 0.99999) {
+        return 1.0e6;
+    }
+    vec2 ndc = clamped * 2.0 - 1.0;
+    float ndcZ = zeroToOne ? depth : depth * 2.0 - 1.0;
+    vec4 world = inverseMatrix * vec4(ndc, ndcZ, 1.0);
+    return abs(world.w) > 1.0e-8 ? length(world.xyz / world.w) : 1.0e6;
 }
 
 void main() {
     vec3 scene = texture(InSampler, texCoord).rgb;
 
-    float depth = texelFetch(DepthSampler, ivec2(texCoord * DepthSize), 0).r;
     bool zeroToOne = fetchFloat(0, 1) > 0.5;
     float radius = fetchFloat(1, 1);
-    mat4 inverseMatrix = mat4(
-        fetchFloat(0, 0), fetchFloat(1, 0), fetchFloat(2, 0), fetchFloat(3, 0),
-        fetchFloat(4, 0), fetchFloat(5, 0), fetchFloat(6, 0), fetchFloat(7, 0),
-        fetchFloat(8, 0), fetchFloat(9, 0), fetchFloat(10, 0), fetchFloat(11, 0),
-        fetchFloat(12, 0), fetchFloat(13, 0), fetchFloat(14, 0), fetchFloat(15, 0));
-
+    mat4 inverseMatrix = fetchMatrix(0);
+    mat4 forwardMatrix = fetchMatrix(2);
+    // Skala proyeksi (ndc per blok pada kedalaman 1): panjang baris x dan y bagian rotasi-proyeksi.
+    float scaleX = length(vec3(forwardMatrix[0][0], forwardMatrix[1][0], forwardMatrix[2][0]));
+    float scaleY = length(vec3(forwardMatrix[0][1], forwardMatrix[1][1], forwardMatrix[2][1]));
     vec2 ndc = texCoord * 2.0 - 1.0;
-    float ndcZ = zeroToOne ? depth : depth * 2.0 - 1.0;
-    vec4 world = inverseMatrix * vec4(ndc, ndcZ, 1.0);
-    vec3 scenePosition = abs(world.w) > 1.0e-8 ? world.xyz / world.w : vec3(1.0e6);
-    float sceneDistance = length(scenePosition);
-    bool hasSurface = depth < 0.9999;
-    // Normal permukaan (menghadap kamera) dari turunan posisi; dipakai agar dinding yang menutupi Lamp tidak ikut berpendar.
-    vec3 surfaceNormal = normalize(cross(dFdx(scenePosition), dFdy(scenePosition)));
-    if (dot(surfaceNormal, scenePosition) > 0.0) {
-        surfaceNormal = -surfaceNormal;
-    }
-
-    // Arah sinar dari titik di kedalaman tengah (aman juga untuk langit yang depth-nya di ujung).
-    vec4 mid = inverseMatrix * vec4(ndc, zeroToOne ? 0.5 : 0.0, 1.0);
-    vec3 direction = normalize(mid.xyz / mid.w);
 
     vec3 additive = vec3(0.0);
     for (int i = 0; i < MAX_LAMPS; i++) {
@@ -87,47 +84,42 @@ void main() {
             continue;
         }
         vec3 center = vec3(fetchFloat(0, row), fetchFloat(1, row), fetchFloat(2, row));
-        float along = dot(center, direction);
-        if (along < -1.0 || length(center - direction * along) > HALF_DIAGONAL + radius) {
+        vec4 clip = forwardMatrix * vec4(center, 1.0);
+        if (clip.w <= 0.1) {
             continue;
         }
-        // Hanya bagian sinar sebelum permukaan yang terlihat; kotak di belakang dinding tidak dihitung.
-        float low = max(0.0, along - 1.0);
-        float high = min(along + 1.0, sceneDistance + 0.02);
-        if (low > high) {
+        vec2 ndcCenter = clip.xy / clip.w;
+        vec2 ndcPerBlock = vec2(scaleX, scaleY) / clip.w;
+        // Jarak di layar dalam satuan blok pada kedalaman Lamp; kotak Lamp dianggap persegi setengah sisi 0,5.
+        vec2 delta = abs((ndc - ndcCenter) / ndcPerBlock);
+        float edge = length(max(delta - vec2(HALF_SIZE), 0.0));
+        if (edge >= radius) {
             continue;
         }
-        for (int k = 0; k < SEARCH_STEPS; k++) {
-            float third = (high - low) / 3.0;
-            float a = low + third;
-            float b = high - third;
-            if (sdBox(direction * a - center) < sdBox(direction * b - center)) {
-                high = b;
-            } else {
-                low = a;
-            }
-        }
-        float tClosest = 0.5 * (low + high);
-        float closest = max(sdBox(direction * tClosest - center), 0.0);
-        // Titik pada permukaan terlihat: titik terdekat kotak Lamp tidak boleh berada di belakang bidang permukaan
-        // (Lamp di balik dinding). Permukaan rata dengan Lamp (titik terdekat di bidang yang sama) tetap lolos.
-        if (hasSurface && tClosest > sceneDistance - 0.05) {
-            vec3 rel = scenePosition - center;
-            vec3 boxPoint = center + clamp(rel, vec3(-HALF_SIZE), vec3(HALF_SIZE));
-            if (dot(surfaceNormal, boxPoint - scenePosition) < -0.03) {
-                continue;
-            }
-        }
-        if (closest >= radius) {
+
+        // Keterlihatan: sampel depth di tengah dan empat titik sekitar Lamp. Permukaan terlihat yang lebih dekat dari
+        // permukaan depan Lamp (pusat dikurangi 0,75) berarti tertutup blok.
+        float lampDistance = length(center);
+        float visible = 0.0;
+        vec2 uvCenter = ndcCenter * 0.5 + 0.5;
+        vec2 offset = vec2(SAMPLE_OFFSET) * ndcPerBlock * 0.5;
+        visible += step(lampDistance - 0.75, sceneDistanceAt(uvCenter, inverseMatrix, zeroToOne)) * 2.0;
+        visible += step(lampDistance - 0.75, sceneDistanceAt(uvCenter + vec2(offset.x, 0.0), inverseMatrix, zeroToOne));
+        visible += step(lampDistance - 0.75, sceneDistanceAt(uvCenter - vec2(offset.x, 0.0), inverseMatrix, zeroToOne));
+        visible += step(lampDistance - 0.75, sceneDistanceAt(uvCenter + vec2(0.0, offset.y), inverseMatrix, zeroToOne));
+        visible += step(lampDistance - 0.75, sceneDistanceAt(uvCenter - vec2(0.0, offset.y), inverseMatrix, zeroToOne));
+        visible /= 6.0;
+        if (visible <= 0.0) {
             continue;
         }
-        float amount = 1.0 - smoothstep(0.0, radius, closest);
+
+        float amount = 1.0 - smoothstep(0.0, radius, edge);
         amount *= amount;
-        if (closest <= 0.001) {
+        if (edge <= 0.001) {
             amount *= CORE_SCALE;
         }
         vec3 hot = mix(colorData.rgb, vec3(1.0), WHITE_CORE * amount);
-        additive += hot * amount * PEAK * colorData.a;
+        additive += hot * amount * PEAK * colorData.a * visible;
     }
 
     fragColor = vec4(scene + additive, 1.0);

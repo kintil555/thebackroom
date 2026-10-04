@@ -27,7 +27,7 @@ import org.joml.Matrix4f;
 import org.joml.Vector4f;
 
 /**
- * Post effect bloom Lamp ({@code lamp_bloom.fsh}): tiap Lamp menyala dibloom sebagai kotak 1 blok yang meluas
+ * Post effect bloom Lamp ({@code lamp_bloom.fsh}): tiap Lamp menyala dibloom secara screen-space (jarak 2D ke Lamp terproyeksi, keterlihatan dari sampel depth) dan meluas
  * {@link LampBloom#RADIUS_BLOCKS} blok di luar tepinya, berwarna sesuai tekstur Lamp. Oklusi memakai depth buffer, jadi
  * bloom tidak tembus dinding. Pola sama dengan {@link ColoredLightRenderer}: uniform PostPass dibekukan saat chain
  * dibuat, jadi data per frame dikirim lewat tekstur kecil.
@@ -36,11 +36,12 @@ import org.joml.Vector4f;
  * <ul>
  *   <li>baris 0: 16 texel = invers matriks (proyeksi * rotasi view), urutan kolom GLSL;</li>
  *   <li>baris 1: texel 0 = 1.0 jika depth zero-to-one, texel 1 = radius bloom (blok);</li>
- *   <li>baris 2..: satu Lamp per baris. Texel 0..2 = pusat relatif kamera (xyz), texel 3 = r,g,b warna dan a = kekuatan (8 bit).</li>
+ *   <li>baris 2: 16 texel = matriks maju (proyeksi * rotasi view);</li>
+ *   <li>baris 3..: satu Lamp per baris. Texel 0..2 = pusat relatif kamera (xyz), texel 3 = r,g,b warna dan a = kekuatan (8 bit).</li>
  * </ul>
  */
 public final class LampBloomRenderer {
-	private static final int FIRST_LAMP_ROW = 2;
+	private static final int FIRST_LAMP_ROW = 3;
 	private static final int DATA_WIDTH = 16;
 	private static final int DATA_HEIGHT = FIRST_LAMP_ROW + LampBloom.MAX_LAMPS;
 
@@ -95,6 +96,10 @@ public final class LampBloomRenderer {
 		INVERSE.get(MATRIX_VALUES);
 		for (int i = 0; i < 16; i++) {
 			image.setPixelABGR(i, 0, Float.floatToRawIntBits(MATRIX_VALUES[i]));
+		}
+		MATRIX.get(MATRIX_VALUES);
+		for (int i = 0; i < 16; i++) {
+			image.setPixelABGR(i, 2, Float.floatToRawIntBits(MATRIX_VALUES[i]));
 		}
 		boolean zeroToOne = RenderSystem.getDevice().getDeviceInfo().isZZeroToOne();
 		for (int x = 0; x < DATA_WIDTH; x++) {

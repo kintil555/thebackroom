@@ -37,7 +37,7 @@ import org.jspecify.annotations.Nullable;
  */
 final class LampBloom {
 	/** Bloom menutupi 1 blok penuh Lamp dan meluas sejauh ini (blok) di luar tepinya. */
-	static final float RADIUS_BLOCKS = 0.3f;
+	static final float RADIUS_BLOCKS = 0.9f;
 	static final int MAX_LAMPS = 16;
 
 	private static final int SCAN_RADIUS_CHUNKS = 3;
