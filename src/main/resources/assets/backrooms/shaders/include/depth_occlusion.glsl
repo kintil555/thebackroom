@@ -23,8 +23,11 @@ mat4 depOccFetchMatrix(sampler2D dataTex, int row) {
 }
 
 // 1 = piksel ini tidak tertutup (sumber terlihat), 0 = permukaan di piksel ini menutupi sumber. Ukuran/kecerahan efek tidak berubah.
+// Tepi lunak bidang: lebar peralihan dari aturan bidang ke aturan titik. Harus lebar agar batasnya tidak terlihat sebagai cincin.
+const float DEP_OCC_RECT_MARGIN = 1.8;
+
 float depOccOpenAt(sampler2D depthTex, vec2 depthSize, mat4 inverseMatrix, bool zeroToOne, float nearD, float farD, float planeThickness,
-                   vec3 center, vec3 normal, float radius, vec2 uv) {
+                   vec3 center, vec3 normal, float radius, float halfHeight, vec2 uv) {
     vec2 clamped = clamp(uv, vec2(0.0), vec2(0.9999));
     float depth = texelFetch(depthTex, ivec2(clamped * depthSize), 0).r;
     if (depth <= 0.00001) {
@@ -55,8 +58,16 @@ float depOccOpenAt(sampler2D depthTex, vec2 depthSize, mat4 inverseMatrix, bool 
     if (t <= 0.0) {
         return openPoint;
     }
-    float inPlane = length(rayDir * t - center);
-    float planeWeight = 1.0 - smoothstep(radius, radius + 0.5, inPlane);
+    vec3 hit = rayDir * t - center;
+    float planeWeight;
+    if (halfHeight > 0.0) {
+        // Persegi panjang: lebar searah cross(Y, normal), tinggi searah Y. Bobot kontinu, tanpa tepi tajam.
+        vec3 tangent = normalize(cross(vec3(0.0, 1.0, 0.0), normal));
+        planeWeight = (1.0 - smoothstep(radius, radius + DEP_OCC_RECT_MARGIN, abs(dot(hit, tangent))))
+            * (1.0 - smoothstep(halfHeight, halfHeight + DEP_OCC_RECT_MARGIN, abs(hit.y)));
+    } else {
+        planeWeight = 1.0 - smoothstep(radius, radius + max(0.5, radius * 0.8), length(hit));
+    }
     float side = dot(normal, center) > 0.0 ? -1.0 : 1.0; // sisi kamera = positif
     float height = dot(surface - center, normal) * side;
     float openPlane = 1.0 - smoothstep(planeThickness, planeThickness + (farD - nearD), height);
@@ -75,11 +86,12 @@ float depthOcclusionOpenness(sampler2D depthTex, vec2 depthSize, sampler2D dataT
     vec3 center = depOccFetchVec3(dataTex, 0, row);
     vec3 normal = depOccFetchVec3(dataTex, 3, row);
     float radius = depOccFetchFloat(dataTex, 6, row);
+    float halfHeight = depOccFetchFloat(dataTex, 7, row);
     vec2 texel = 1.5 / depthSize;
-    float sum = 2.0 * depOccOpenAt(depthTex, depthSize, inverseMatrix, zeroToOne, nearD, farD, planeThickness, center, normal, radius, uv);
-    sum += depOccOpenAt(depthTex, depthSize, inverseMatrix, zeroToOne, nearD, farD, planeThickness, center, normal, radius, uv + vec2(texel.x, 0.0));
-    sum += depOccOpenAt(depthTex, depthSize, inverseMatrix, zeroToOne, nearD, farD, planeThickness, center, normal, radius, uv - vec2(texel.x, 0.0));
-    sum += depOccOpenAt(depthTex, depthSize, inverseMatrix, zeroToOne, nearD, farD, planeThickness, center, normal, radius, uv + vec2(0.0, texel.y));
-    sum += depOccOpenAt(depthTex, depthSize, inverseMatrix, zeroToOne, nearD, farD, planeThickness, center, normal, radius, uv - vec2(0.0, texel.y));
+    float sum = 2.0 * depOccOpenAt(depthTex, depthSize, inverseMatrix, zeroToOne, nearD, farD, planeThickness, center, normal, radius, halfHeight, uv);
+    sum += depOccOpenAt(depthTex, depthSize, inverseMatrix, zeroToOne, nearD, farD, planeThickness, center, normal, radius, halfHeight, uv + vec2(texel.x, 0.0));
+    sum += depOccOpenAt(depthTex, depthSize, inverseMatrix, zeroToOne, nearD, farD, planeThickness, center, normal, radius, halfHeight, uv - vec2(texel.x, 0.0));
+    sum += depOccOpenAt(depthTex, depthSize, inverseMatrix, zeroToOne, nearD, farD, planeThickness, center, normal, radius, halfHeight, uv + vec2(0.0, texel.y));
+    sum += depOccOpenAt(depthTex, depthSize, inverseMatrix, zeroToOne, nearD, farD, planeThickness, center, normal, radius, halfHeight, uv - vec2(0.0, texel.y));
     return sum / 6.0;
 }

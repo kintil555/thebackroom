@@ -28,6 +28,7 @@ layout(std140) uniform SamplerInfo {
 };
 
 #moj_import <backrooms:depth_occlusion.glsl>
+#moj_import <backrooms:depth_volume.glsl>
 
 in vec2 texCoord;
 
@@ -54,6 +55,10 @@ const float CLOSE_GLOW_GAIN = 2.6;
 // Api: setengah ukuran ruang portal (blok), untuk menjaga pusaran tetap bulat.
 const vec2 HALF_SIZE = vec2(1.5, 2.5);
 const float FLAME_GAIN = 1.9;
+// Api volumetrik: ketebalan volume di sekitar bidang portal (setengah, blok), jumlah langkah raymarch, dan batas panjang lintasan.
+const float FLAME_HALF_DEPTH = 0.5;
+const int FLAME_STEPS = 6;
+const float FLAME_MAX_PATH = 2.5;
 
 float decode16(vec2 hiLo) {
     return (floor(hiLo.x * 255.0 + 0.5) * 256.0 + floor(hiLo.y * 255.0 + 0.5)) / 65535.0;
@@ -117,6 +122,27 @@ vec3 flame(vec2 local, float time, float seed, float amount) {
     return c * e * FLAME_GAIN;
 }
 
+// Api sebagai volume nyata di dunia: raymarch menembus kotak portal, berhenti di permukaan terlihat (depth buffer), sehingga
+// api tertutup dinding secara fisik dan punya kedalaman/parallax. Profil kedalaman menebal di tengah, fbm bergeser per kedalaman.
+vec3 flameVolume(vec3 rayDir, float sceneDist, vec3 center, vec3 tangent, vec3 normal, float halfW, float halfH, float time, float seed, float amount, float jitter) {
+    float t0;
+    float t1;
+    if (!depVolSegment(rayDir, sceneDist, center, tangent, normal, vec3(halfW * 1.1, halfH * 1.1, FLAME_HALF_DEPTH), t0, t1)) {
+        return vec3(0.0);
+    }
+    t1 = min(t1, t0 + FLAME_MAX_PATH);
+    float dt = (t1 - t0) / float(FLAME_STEPS);
+    vec3 sum = vec3(0.0);
+    for (int k = 0; k < FLAME_STEPS; k++) {
+        float t = t0 + (float(k) + jitter) * dt;
+        vec3 l = depVolLocal(rayDir, t, center, tangent, normal);
+        float profile = 1.0 - smoothstep(0.0, FLAME_HALF_DEPTH, abs(l.z));
+        profile = 0.35 + 0.65 * profile;
+        sum += flame(vec2(l.x / halfW, l.y / halfH), time + l.z * 0.9, seed + l.z * 3.0, amount) * profile * dt;
+    }
+    return sum * 1.4;
+}
+
 // Cahaya putih kehijauan saat menutup: menguat sampai CLOSE_SPLIT, lalu ikut mengecil bersama portal dan memudar.
 vec3 closeGlow(vec2 local, float t) {
     float e = clamp((t - CLOSE_SPLIT) / (1.0 - CLOSE_SPLIT), 0.0, 1.0);
@@ -173,15 +199,25 @@ void main() {
         if (box > 1.7 && close <= 0.001) {
             continue;
         }
+        // Api pengisian energi (portal belum ada, hanya bingkai): volume nyata, oklusinya dari depth lewat raymarch.
+        if (flameAmount > 0.003 && box < 1.6) {
+            vec3 rayDir;
+            float sceneDist;
+            depVolBegin(DepthSampler, DepthSize, DataSampler, OCCLUSION_ROW, texCoord, rayDir, sceneDist);
+            vec3 bCenter;
+            vec3 bTangent;
+            vec3 bNormal;
+            float bHalfW;
+            float bHalfH;
+            depVolLoadBox(DataSampler, OCCLUSION_ROW, i, bCenter, bTangent, bNormal, bHalfW, bHalfH);
+            if (bHalfW > 0.0 && bHalfH > 0.0) {
+                glow += flameVolume(rayDir, sceneDist, bCenter, bTangent, bNormal, bHalfW, bHalfH, time, seed, flameAmount, hash21(pix + time));
+            }
+        }
         // Piksel yang permukaan terlihatnya menutupi bidang portal tidak ikut efek (tengah tertutup tidak mematikan sisanya).
         float open = depthOcclusionOpenness(DepthSampler, DepthSize, DataSampler, OCCLUSION_ROW, i, texCoord);
         if (open <= 0.001) {
             continue;
-        }
-
-        // Api pengisian energi (portal belum ada, hanya bingkai).
-        if (flameAmount > 0.003 && box < 1.2) {
-            glow += flame(local, time, seed, flameAmount) * open;
         }
         // Cahaya penutupan.
         if (close > 0.001) {

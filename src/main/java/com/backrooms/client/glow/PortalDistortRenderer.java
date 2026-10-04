@@ -51,7 +51,6 @@ public final class PortalDistortRenderer {
 	/** Oklusi depth per piksel (API DepthOcclusion); baris pertamanya harus sama dengan OCCLUSION_ROW di portal_distort.fsh. */
 	private static final DepthOcclusion OCCLUSION = DepthOcclusion.at(MAX_SOURCES + 1, MAX_SOURCES).range(0.3f, 0.6f).planeThickness(0.6f);
 	private static final int DATA_HEIGHT = OCCLUSION.endRow();
-	private static final float PLANE_RADIUS_BLOCKS = 3.1f;
 	private static final List<DepthOcclusion.Source> OCCLUDERS = new ArrayList<>(MAX_SOURCES);
 
 	private static final Identifier DATA_TEXTURE_ID = Identifier.fromNamespaceAndPath(BackroomsMod.MOD_ID, "textures/effect/portal_distort_data.png");
@@ -222,7 +221,7 @@ public final class PortalDistortRenderer {
 		}
 		Vec3 normal = rightDir.getAxis() == Direction.Axis.X ? new Vec3(0.0, 0.0, 1.0) : new Vec3(1.0, 0.0, 0.0);
 		return new Quad(c[0] / width, c[1] / height, r[0] / width, r[1] / height, u[0] / width, u[1] / height, strength, seed, distance, flame, close,
-			DepthOcclusion.Source.plane(center, normal, PLANE_RADIUS_BLOCKS));
+			DepthOcclusion.Source.rect(center, normal, (float) HALF_WIDTH, (float) HALF_HEIGHT));
 	}
 
 	/**

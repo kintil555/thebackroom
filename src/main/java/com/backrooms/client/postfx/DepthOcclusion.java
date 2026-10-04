@@ -37,7 +37,8 @@ import org.joml.Matrix4f;
  *
  * <p>Tata letak tekstur data (float utuh, 4 byte per texel): baris {@code firstRow} = invers (proyeksi * rotasi view), 16 texel;
  * baris {@code firstRow + 1}: texel 0 = 1.0 jika depth zero-to-one, 1 = near, 2 = far, 3 = planeThickness; baris {@code firstRow + 2 + i} = sumber i:
- * texel 0..2 = pusat relatif kamera, 3..5 = normal bidang (satuan), 6 = radius bidang (0 = sumber titik).
+ * texel 0..2 = pusat relatif kamera, 3..5 = normal bidang (satuan), 6 = radius bidang atau setengah lebar (0 = sumber titik),
+ * 7 = setengah tinggi (0 = bidang bulat, > 0 = bidang persegi panjang).
  *
  * @param firstRow   baris pertama di tekstur data
  * @param maxSources jumlah sumber maksimum
@@ -62,13 +63,22 @@ public record DepthOcclusion(int firstRow, int maxSources, float near, float far
 	 * @param planeNormal normal bidang sumber (tidak perlu satuan); null untuk sumber titik
 	 * @param planeRadius radius bidang dalam blok; 0 untuk sumber titik
 	 */
-	public record Source(Vec3 center, Vec3 planeNormal, float planeRadius) {
+	public record Source(Vec3 center, Vec3 planeNormal, float planeRadius, float planeHalfHeight) {
 		public static Source point(Vec3 center) {
-			return new Source(center, null, 0.0f);
+			return new Source(center, null, 0.0f, 0.0f);
 		}
 
+		/** Bidang bulat (radius dalam blok). */
 		public static Source plane(Vec3 center, Vec3 normal, float radius) {
-			return new Source(center, normal, radius);
+			return new Source(center, normal, radius, 0.0f);
+		}
+
+		/**
+		 * Bidang persegi panjang tegak (portal, layar): lebar searah garis datar pada bidang (cross(Y, normal)), tinggi searah Y.
+		 * Jangan pakai bidang bulat untuk benda persegi: batas lingkaran terlihat sebagai cincin distorsi di layar.
+		 */
+		public static Source rect(Vec3 center, Vec3 normal, float halfWidth, float halfHeight) {
+			return new Source(center, normal, halfWidth, halfHeight);
 		}
 	}
 
@@ -151,6 +161,7 @@ public record DepthOcclusion(int firstRow, int maxSources, float near, float far
 				put(image, 4, row, (float) unit.y);
 				put(image, 5, row, (float) unit.z);
 				put(image, 6, row, source.planeRadius());
+				put(image, 7, row, source.planeHalfHeight());
 			}
 		}
 	}
