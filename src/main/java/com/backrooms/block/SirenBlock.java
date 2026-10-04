@@ -2,6 +2,7 @@ package com.backrooms.block;
 
 import com.backrooms.ModBlockEntities;
 import com.backrooms.client.SirenAlarmSound;
+import com.backrooms.client.light.ColoredLights;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -72,6 +73,7 @@ public class SirenBlock extends Block implements EntityBlock {
 		return (tickLevel, tickPos, tickState, entity) -> {
 			if (tickLevel instanceof ClientLevel clientLevel) {
 				SirenAlarmSound.tickBlock(clientLevel, tickPos, tickState);
+				ColoredLights.markSiren(clientLevel, tickPos, tickState);
 			}
 		};
 	}

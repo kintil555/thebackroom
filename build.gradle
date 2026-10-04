@@ -12,6 +12,7 @@ base {
 repositories {
     mavenCentral()
     maven { url 'https://maven.fabricmc.net/' }
+    maven { url 'https://maven.gegy.dev' }
 }
 
 dependencies {
@@ -19,6 +20,8 @@ dependencies {
     // No mappings line: Loom defaults to Mojang's official mappings on 26.x.
     implementation 'net.fabricmc:fabric-loader:0.19.5'
     implementation 'net.fabricmc.fabric-api:fabric-api:0.157.0+26.2'
+    // API LambDynamicLights hanya untuk kompilasi; mod ini tetap jalan tanpa LambDynamicLights terpasang.
+    compileOnly 'dev.lambdaurora.lambdynamiclights:lambdynamiclights-api:4.12.4+26.2'
 }
 
 java {

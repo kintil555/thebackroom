@@ -16,6 +16,9 @@
 		],
 		"client": [
 			"com.backrooms.client.BackroomsClient"
+		],
+		"lambdynlights:initializer": [
+			"com.backrooms.compat.LdlCompat"
 		]
 	},
 	"depends": {

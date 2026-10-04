@@ -54,23 +54,23 @@ public final class PortalGlowRenderer {
 	// --- Tampilan: ubah di sini untuk menyetel glow ---
 	// Fase isi energi: glow muncul perlahan, makin lebar dan makin terang sampai portal terbuka.
 	private static final float START_RADIUS_BLOCKS = 0.5f;
-	private static final float PEAK_RADIUS_BLOCKS = 18.0f;
+	private static final float PEAK_RADIUS_BLOCKS = 28.0f;
 	private static final float START_INTENSITY = 0.04f;
 	private static final float PEAK_INTENSITY = 1.0f;
 	/** Bloom naik pelan sampai fraksi durasi ini (detik 9 dari 10), lalu melebar mendadak (tetap mulus, ada easing). */
-	private static final float BURST_START_FRACTION = 0.9f;
+	static final float BURST_START_FRACTION = 0.9f;
 	/** Tingkat bloom (0..1) yang sudah tercapai sesaat sebelum burst dimulai. */
 	private static final float PRE_BURST_LEVEL = 0.12f;
 	// Fase setelah portal terbuka: radius mengecil dan intensitas turun perlahan.
 	private static final float END_RADIUS_BLOCKS = 2.0f;
-	private static final float GLOW_DECAY_TICKS = 160.0f;
+	static final float GLOW_DECAY_TICKS = 160.0f;
 	private static final float FADE_IN_TICKS = 8.0f;
 	// Efek kamera (distorsi + blur) di dekat portal.
 	private static final float WARP_RANGE_BLOCKS = 7.0f;
-		/** Warna tint glow (putih hangat kekuningan). */
-	private static final int TINT_R = 255;
-	private static final int TINT_G = 236;
-	private static final int TINT_B = 170;
+	/** Warna tengah glow (kuning kehijauan). Inti memutih dan tepi lebih hijau; gradiennya dihitung di portal_glow.fsh. */
+	private static final int TINT_R = 226;
+	private static final int TINT_G = 255;
+	private static final int TINT_B = 120;
 	/** Di dekat portal intensitas diturunkan sampai porsi ini agar layar tidak terbakar putih. */
 	private static final float MIN_NEAR_FACTOR = 0.35f;
 	private static final float NEAR_DISTANCE_BLOCKS = 3.0f;
@@ -92,7 +92,7 @@ public final class PortalGlowRenderer {
 	}
 
 	/** Posisi layar ternormalisasi (asal kiri-atas), radius sebagai fraksi tinggi layar, dan intensitas akhir. */
-	private record Glow(float x, float y, float radius, float intensity) {
+	private record Glow(float x, float y, float radius, float intensity, float spread) {
 	}
 
 	/** Dipanggil tiap frame setelah dunia tergambar dan sebelum GUI. Tidak melakukan apa-apa jika tak ada sumber. */
@@ -156,12 +156,15 @@ public final class PortalGlowRenderer {
 		float radiusBlocks = Mth.lerp(rise, START_RADIUS_BLOCKS, PEAK_RADIUS_BLOCKS);
 		float envelope = Mth.lerp(rise, START_INTENSITY, PEAK_INTENSITY);
 		float flicker = PortalGlowFlicker.value(nowTicks / 20.0, source.seed);
+		// Spread 0..1: seberapa lebar plateau terang bloom. Melebar bersama burst agar seluruh portal tertutup.
+		float spread = PortalGlowFlicker.smooth(1.0f, (progress - BURST_START_FRACTION) / (1.0f - BURST_START_FRACTION));
 
 		if (source.openedTick >= 0L) {
 			float decay = PortalGlowFlicker.smooth(GLOW_DECAY_TICKS, (float) Math.max(0.0, nowTicks - source.openedTick));
 			radiusBlocks = Mth.lerp(decay, PEAK_RADIUS_BLOCKS, END_RADIUS_BLOCKS);
 			envelope = PEAK_INTENSITY * (1.0f - decay);
 			flicker = Mth.lerp(decay, flicker, 1.0f);
+			spread = Mth.lerp(decay, 1.0f, 0.35f);
 		}
 		float[] projected = project(camera, target, radiusBlocks, width, height);
 		if (projected == null) {
@@ -172,14 +175,14 @@ public final class PortalGlowRenderer {
 		float near = Mth.clamp((float) Math.sqrt(distanceSq) / NEAR_DISTANCE_BLOCKS, MIN_NEAR_FACTOR, 1.0f);
 		float intensity = envelope * flicker * fadeIn * near * source.visibility;
 
-		return new Glow(projected[0] / width, projected[1] / height, Math.min(2.0f, projected[2] / height), intensity);
+		return new Glow(projected[0] / width, projected[1] / height, Math.min(2.0f, projected[2] / height), intensity, spread);
 	}
 
 	/**
 	 * Kurva bloom: naik halus dan pelan sampai {@link #PRE_BURST_LEVEL} pada {@link #BURST_START_FRACTION}, lalu melonjak
 	 * ke 1.0 di sisa durasi dengan easing smoothstep (tanpa patahan di awal maupun akhir).
 	 */
-	private static float riseLevel(float progress) {
+	static float riseLevel(float progress) {
 		float slow = PRE_BURST_LEVEL * PortalGlowFlicker.smooth(1.0f, Math.min(1.0f, progress / BURST_START_FRACTION));
 		float burst = PortalGlowFlicker.smooth(1.0f, (progress - BURST_START_FRACTION) / (1.0f - BURST_START_FRACTION));
 		return slow + (1.0f - slow) * burst;
@@ -226,7 +229,6 @@ public final class PortalGlowRenderer {
 
 	private static void writeData(List<Glow> glows, float warp, float phase) {
 		NativeImage image = dataTexture.getPixels();
-		int tint = abgr(TINT_R, TINT_G, TINT_B, 255);
 		for (int row = 0; row < MAX_SOURCES; row++) {
 			if (row >= glows.size()) {
 				for (int column = 0; column < DATA_WIDTH; column++) {
@@ -241,7 +243,8 @@ public final class PortalGlowRenderer {
 			int intensity = encode16(glow.intensity());
 			image.setPixelABGR(0, row, abgr(x >> 8, x & 0xFF, y >> 8, y & 0xFF));
 			image.setPixelABGR(1, row, abgr(radius >> 8, radius & 0xFF, intensity >> 8, intensity & 0xFF));
-			image.setPixelABGR(2, row, tint);
+			// Alpha texel 2 = spread (8 bit).
+			image.setPixelABGR(2, row, abgr(TINT_R, TINT_G, TINT_B, Math.round(Mth.clamp(glow.spread(), 0.0f, 1.0f) * 255.0f)));
 		}
 		// Baris parameter kamera: texel 0 = warp (16 bit) + blur (16 bit), texel 1 = fase waktu 0..1 (16 bit).
 		int warpBits = encode16(warp);

@@ -7,7 +7,7 @@
 // Satu baris = satu sumber (maksimal 4), 8 bit per kanal:
 //   texel 0: r,g = x (16 bit hi,lo)   b,a = y (16 bit hi,lo)   posisi layar ternormalisasi, asal kiri-atas
 //   texel 1: r,g = radius/2 (16 bit, fraksi tinggi layar, maks 2.0)    b,a = intensitas (16 bit)
-//   texel 2: r,g,b = warna tint
+//   texel 2: r,g,b = warna tengah glow   a = spread 0..1 (lebar plateau terang; naik saat burst)
 // x,y disimpan sebagai (nilai + 0.5) / 2 agar pusat yang sedikit di luar layar tetap terwakili.
 //
 // Baris ke-4 (index 4) = efek kamera di dekat portal:
@@ -29,8 +29,6 @@ out vec4 fragColor;
 const int MAX_SOURCES = 4;
 // Penguat sebelum kurva saturasi: inti glow melewati 1.0 sehingga memutih seperti bloom sungguhan.
 const float GAIN = 4.5;
-// Glow sedikit memanjang ke atas-bawah, mengikuti bentuk portal 3x5.
-const float VERTICAL_STRETCH = 1.35;
 // Efek kamera. Ubah angka ini untuk menyetel kekuatannya.
 const float LENS_STRENGTH = 0.9;   // kelengkungan barrel/pincushion yang berdenyut
 const float WAVE_STRENGTH = 0.012; // riak melengkung (fraksi layar)
@@ -42,13 +40,22 @@ float decode16(vec2 hiLo) {
     return (floor(hiLo.x * 255.0 + 0.5) * 256.0 + floor(hiLo.y * 255.0 + 0.5)) / 65535.0;
 }
 
-// Inti tajam + badan lembut + halo lebar, semuanya jatuh ke nol di tepi radius.
-float glowShape(float d) {
-    float core = exp(-d * d * 42.0);
-    float body = exp(-d * d * 10.0);
-    float halo = 1.0 / (1.0 + d * d * 16.0);
+// Inti + badan lembut + halo lebar, semuanya jatuh ke nol di tepi radius. spread -> 1 melebarkan inti dan badan
+// sehingga plateau terang menutupi seluruh portal (bulat, tidak lonjong).
+float glowShape(float d, float spread) {
+    float core = exp(-d * d * mix(42.0, 7.0, spread));
+    float body = exp(-d * d * mix(10.0, 3.5, spread));
+    float halo = 1.0 / (1.0 + d * d * mix(16.0, 6.0, spread));
     float shape = 1.25 * core + 0.60 * body + 0.28 * halo;
     return shape * (1.0 - smoothstep(0.65, 1.0, d));
+}
+
+// Gradien warna radial: inti putih -> kuning kehijauan (tint) -> hijau di tepi.
+vec3 glowColor(vec3 tint, float d) {
+    vec3 white = vec3(1.0, 1.0, 0.93);
+    vec3 outer = tint * vec3(0.78, 1.0, 0.32);
+    vec3 c = mix(white, tint, smoothstep(0.0, 0.30, d));
+    return mix(c, outer, smoothstep(0.25, 0.85, d));
 }
 
 void main() {
@@ -93,13 +100,13 @@ void main() {
             continue;
         }
         vec2 center = (vec2(decode16(posData.rg), decode16(posData.ba)) * 2.0 - 0.5) * OutSize;
-        vec2 offset = (pixel - center) / vec2(radius, radius * VERTICAL_STRETCH);
+        vec2 offset = (pixel - center) / radius;
         float d = length(offset);
         if (d >= 1.0) {
             continue;
         }
-        vec3 tint = texelFetch(DataSampler, ivec2(2, i), 0).rgb;
-        glow += tint * glowShape(d) * intensity * GAIN;
+        vec4 tintData = texelFetch(DataSampler, ivec2(2, i), 0);
+        glow += glowColor(tintData.rgb, d) * glowShape(d, tintData.a) * intensity * GAIN;
     }
 
     // Screen-blend lewat eksponensial: menambah terang dengan mulus dan mendekati putih tanpa clipping keras.

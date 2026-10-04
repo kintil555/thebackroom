@@ -22,6 +22,7 @@ public class BackroomsMod implements ModInitializer {
 	public void onInitialize() {
 		CoverAttachments.init();
 		ModSounds.init();
+		ModParticles.init();
 		ModBlocks.init();
 		ModBlockEntities.init();
 
