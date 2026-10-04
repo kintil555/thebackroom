@@ -18,5 +18,6 @@
   "subtitles.backrooms.portal_loop": "Energy hums",
   "subtitles.backrooms.portal_burst_energy": "Energy bursts",
   "subtitles.backrooms.portal_after_spawn": "Portal opens",
+  "subtitles.backrooms.portal_alarm": "Alarm blares",
   "block.backrooms.placeholder_portal": "Placeholder Portal"
 }

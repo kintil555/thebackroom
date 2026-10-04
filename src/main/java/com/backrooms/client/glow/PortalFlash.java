@@ -22,11 +22,20 @@ final class PortalFlash {
 	/** Bayangan sisa muncul cepat (tertutup putih) dan memudar jauh lebih lama dari putihnya. */
 	private static final float GHOST_ATTACK_TICKS = 4.0f;
 	private static final float GHOST_TOTAL_TICKS = 140.0f;
-	/** Kekuatan minimum jika portal tertutup blok dari pemain (di dalam jangkauan tetap terkena, hanya lebih lemah). */
-	private static final float OCCLUDED_FACTOR = 0.4f;
+	/** Jejak frame sebelumnya: bertahan kuat 5 detik setelah portal menyala, lalu memudar halus. */
+	private static final float TRAIL_HOLD_TICKS = 100.0f;
+	private static final float TRAIL_FADE_TICKS = 40.0f;
+	/** Kecepatan fade keterlihatan portal (per detik) saat kamera berlindung / keluar dari balik blok. */
+	private static final float VISIBILITY_RATE = 10.0f;
+	/** Jejak tetap penuh sampai jarak ini dari portal (cahaya setinggi itu di jarak 10 blok tetap menyilaukan), lalu memudar. */
+	private static final float TRAIL_FULL_DISTANCE = 10.0f;
+	private static final float TRAIL_FADE_DISTANCE = 6.0f;
 
 	private static double startTick = -1.0;
 	private static float strength;
+	/** Keterlihatan portal dari kamera 0..1 (smoothing); 0 = berlindung di balik blok, semua efek layar tidak digambar. */
+	private static float visibility;
+	private static float viewDistance;
 	private static Vec3 target = Vec3.ZERO;
 	private static boolean needsCapture;
 	private static float ghostX;
@@ -44,7 +53,9 @@ final class PortalFlash {
 			return;
 		}
 		float falloff = 1.0f - 0.35f * (float) (distance / RANGE_BLOCKS);
-		strength = falloff * Mth.lerp(Mth.clamp(source.visibility, 0.0f, 1.0f), OCCLUDED_FACTOR, 1.0f);
+		strength = falloff;
+		visibility = Mth.clamp(source.visibility, 0.0f, 1.0f);
+		viewDistance = (float) distance;
 		startTick = level.getGameTime();
 		target = center;
 		needsCapture = true;
@@ -54,10 +65,24 @@ final class PortalFlash {
 	static void reset() {
 		startTick = -1.0;
 		needsCapture = false;
+		visibility = 0.0f;
+	}
+
+	/** Dipanggil tiap frame selagi efek aktif: memperbarui keterlihatan portal dan jarak kamera. Terhalang blok = efek tak tergambar. */
+	static void updateView(ClientLevel level, Vec3 eye, float frameSeconds) {
+		if (startTick < 0.0) {
+			return;
+		}
+		boolean visible = PortalSight.visible(level, eye, target);
+		visibility = Mth.lerp(Math.min(1.0f, frameSeconds * VISIBILITY_RATE), visibility, visible ? 1.0f : 0.0f);
+		if (visibility < 0.01f) {
+			visibility = 0.0f;
+		}
+		viewDistance = (float) eye.distanceTo(target);
 	}
 
 	static boolean active(double nowTicks) {
-		return startTick >= 0.0 && nowTicks - startTick < GHOST_TOTAL_TICKS;
+		return startTick >= 0.0 && nowTicks - startTick < Math.max(GHOST_TOTAL_TICKS, TRAIL_HOLD_TICKS + TRAIL_FADE_TICKS);
 	}
 
 	/** True sekali setelah efek dipicu: renderer lalu memproyeksikan {@link #target()} dan memanggil {@link #setGhost}. */
@@ -96,12 +121,19 @@ final class PortalFlash {
 		}
 		float t = (float) (nowTicks - startTick);
 		float fade = PortalGlowFlicker.smooth(WHITE_FADE_TICKS, t - WHITE_HOLD_TICKS);
-		return strength * (1.0f - fade);
+		return strength * (1.0f - fade) * visibility;
 	}
 
-	/** Kekuatan jejak frame sebelumnya 0..1: tinggi sesaat setelah flash, lalu memudar pelan (akar agar jejaknya bertahan lebih lama). */
+	/** Kekuatan jejak frame sebelumnya 0..1: naik cepat saat portal menyala, penuh selama 5 detik, lalu memudar halus. */
 	static float trail(double nowTicks) {
-		return (float) Math.sqrt(ghost(nowTicks));
+		if (!active(nowTicks)) {
+			return 0.0f;
+		}
+		float t = (float) (nowTicks - startTick);
+		float attack = PortalGlowFlicker.smooth(GHOST_ATTACK_TICKS, t);
+		float fade = PortalGlowFlicker.smooth(TRAIL_FADE_TICKS, t - TRAIL_HOLD_TICKS);
+		float range = 1.0f - PortalGlowFlicker.smooth(TRAIL_FADE_DISTANCE, viewDistance - TRAIL_FULL_DISTANCE);
+		return attack * (1.0f - fade) * range * visibility;
 	}
 
 	/** Kekuatan bayangan sisa 0..1. */
@@ -112,6 +144,6 @@ final class PortalFlash {
 		float t = (float) (nowTicks - startTick);
 		float attack = PortalGlowFlicker.smooth(GHOST_ATTACK_TICKS, t);
 		float fade = PortalGlowFlicker.smooth(GHOST_TOTAL_TICKS, t);
-		return strength * attack * (1.0f - fade);
+		return strength * attack * (1.0f - fade) * visibility;
 	}
 }

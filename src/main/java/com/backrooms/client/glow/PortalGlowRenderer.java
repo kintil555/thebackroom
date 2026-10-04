@@ -77,8 +77,8 @@ public final class PortalGlowRenderer {
 	private static final float EXPOSURE_MIN_REACH_BLOCKS = 8.0f;
 	/** Menghadap jauh dari bloom tetap menggelap sedikit (porsi dari penuh). */
 	private static final float EXPOSURE_BACK_FACTOR = 0.25f;
-	/** Persistensi jejak per 1/60 detik pada kekuatan penuh: 0.95 = tiap frame 95% gambar lama dipertahankan (jejak sekitar 0,3 detik). */
-	private static final float TRAIL_PERSISTENCE = 0.95f;
+	/** Persistensi jejak per 1/60 detik pada kekuatan penuh: 0.98 = tiap frame 98% gambar lama dipertahankan (jejak sekitar 0,6 detik). */
+	private static final float TRAIL_PERSISTENCE = 0.98f;
 	/** Radius bayangan sisa flashbang (blok di posisi portal, diproyeksikan ke layar saat flash terjadi). */
 	private static final float GHOST_RADIUS_BLOCKS = 5.0f;
 	/** Warna tengah glow (kuning kehijauan). Inti memutih dan tepi lebih hijau; gradiennya dihitung di portal_glow.fsh. */
@@ -137,10 +137,12 @@ public final class PortalGlowRenderer {
 		if (PortalFlash.needsCapture()) {
 			captureGhost(camera, main.width, main.height);
 		}
+		PortalFlash.updateView(level, camera.position(), frameSeconds);
 		List<Glow> glows = new ArrayList<>(sources.size());
 		float warp = 0.0f;
 		float dark = 0.0f;
 		for (PortalGlowManager.Source source : sources) {
+			updateVisibility(source, level, camera.position(), frameSeconds);
 			Glow glow = evaluate(source, level, player, camera, nowTicks, frameSeconds, main.width, main.height);
 			if (glow != null) {
 				glows.add(glow);
@@ -150,13 +152,14 @@ public final class PortalGlowRenderer {
 		}
 		float flashWhite = PortalFlash.white(nowTicks);
 		float ghost = PortalFlash.ghost(nowTicks);
-		boolean idle = glows.isEmpty() && warp <= 0.001f && dark <= 0.001f && flashWhite <= 0.001f && ghost <= 0.001f;
+		float trailBase = PortalFlash.trail(nowTicks);
+		boolean idle = glows.isEmpty() && warp <= 0.001f && dark <= 0.001f && flashWhite <= 0.001f && ghost <= 0.001f && trailBase <= 0.001f;
 		if (idle || !ensureResources(minecraft)) {
 			historyValid = false;
 			return;
 		}
 		// Persistensi per frame disesuaikan dengan waktu frame agar panjang jejak sama di 60 maupun 240 FPS.
-		float trail = historyValid ? PortalFlash.trail(nowTicks) * (float) Math.pow(TRAIL_PERSISTENCE, frameSeconds * 60.0f) : 0.0f;
+		float trail = historyValid ? trailBase * (float) Math.pow(TRAIL_PERSISTENCE, frameSeconds * 60.0f) : 0.0f;
 
 		// Yang paling dekat (radius layar terbesar) lebih dulu: hanya MAX_SOURCES baris yang muat di tekstur data.
 		glows.sort(Comparator.comparingDouble(Glow::radius).reversed());
@@ -176,10 +179,7 @@ public final class PortalGlowRenderer {
 			return null;
 		}
 
-		// Glow ini efek layar tanpa depth test; tanpa cek ini ia akan tembus dinding. Tengah portal yang tertutup
-		// blok memudar halus, bukan lenyap seketika. Kaca, iron bars, dan blok transparan lain tidak dianggap penutup.
-		boolean clear = PortalSight.clear(level, eye, target);
-		source.visibility = Mth.lerp(Math.min(1.0f, frameSeconds * VISIBILITY_RATE), source.visibility, clear ? 1.0f : 0.0f);
+		// Keterlihatan sudah diperbarui di updateVisibility; portal yang tertutup blok tidak digambar.
 		if (source.visibility <= 0.01f) {
 			return null;
 		}
@@ -213,6 +213,19 @@ public final class PortalGlowRenderer {
 	}
 
 	/**
+	 * Memperbarui keterlihatan portal dari kamera. Efek layar tanpa depth test akan tembus dinding, jadi bloom dan semua
+	 * efek sampingnya (warp, exposure, flashbang, jejak) hanya digambar selagi portal terlihat; berlindung di balik blok
+	 * memudar cepat sampai 0. Kaca, iron bars, dan blok transparan lain tidak dianggap penutup.
+	 */
+	private static void updateVisibility(PortalGlowManager.Source source, ClientLevel level, Vec3 eye, float frameSeconds) {
+		boolean visible = PortalSight.visible(level, eye, Vec3.atCenterOf(source.center));
+		source.visibility = Mth.lerp(Math.min(1.0f, frameSeconds * VISIBILITY_RATE), source.visibility, visible ? 1.0f : 0.0f);
+		if (source.visibility < 0.01f) {
+			source.visibility = 0.0f;
+		}
+	}
+
+	/**
 	 * Kurva bloom: naik halus dan pelan sampai {@link #PRE_BURST_LEVEL} pada {@link #BURST_START_FRACTION}, lalu melonjak
 	 * ke 1.0 di sisa durasi dengan easing smoothstep (tanpa patahan di awal maupun akhir).
 	 */
@@ -239,7 +252,7 @@ public final class PortalGlowRenderer {
 		}
 		float distance = (float) camera.position().distanceTo(Vec3.atCenterOf(source.center));
 		float near = Mth.clamp(1.0f - distance / WARP_RANGE_BLOCKS, 0.0f, 1.0f);
-		return time * near * near * (3.0f - 2.0f * near);
+		return time * near * near * (3.0f - 2.0f * near) * source.visibility;
 	}
 
 	/**

@@ -2,6 +2,7 @@ package com.backrooms.mixin.client;
 
 import com.backrooms.client.glow.PortalGlowRenderer;
 import com.backrooms.client.light.ColoredLightRenderer;
+import com.backrooms.client.light.LampBloomRenderer;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.resource.CrossFrameResourcePool;
 import net.minecraft.client.DeltaTracker;
@@ -31,6 +32,7 @@ public abstract class GameRendererGlowMixin {
 	private void backrooms$portalGlow(DeltaTracker deltaTracker, boolean advanceGameTime, CallbackInfo ci) {
 		// Cahaya berwarna lebih dulu agar bloom portal tergambar di atasnya.
 		ColoredLightRenderer.render(this.mainRenderTarget, this.resourcePool, deltaTracker);
+		LampBloomRenderer.render(this.mainRenderTarget, this.resourcePool, deltaTracker);
 		PortalGlowRenderer.render(this.mainRenderTarget, this.resourcePool, deltaTracker);
 	}
 }

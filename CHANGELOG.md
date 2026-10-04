@@ -29,3 +29,9 @@
 - Portal: pemain dalam 12 blok saat portal terbuka terkena efek flashbang (putih memudar, bayangan sisa di layar, dan jejak frame sebelumnya: kamera bergerak tetapi gambar lama bertahan dan memudar pelan seperti motion blur, lewat target history persisten)
 - Portal: bloom memancarkan cahaya ke sekitar (post effect cahaya berwarna), jangkauan dan terangnya mengikuti ukuran bloom, tanpa perlu LambDynamicLights
 - Partikel listrik: tipe baru electric_spark_burst, lebih besar dan lebih kuat, menyembur saat bloom state burst
+- Portal: jejak frame sebelumnya (motion trail) lebih kuat dan lebih lama: penuh selama 5 detik setelah portal menyala, lalu memudar 2 detik; persistensi per frame 0,95 -> 0,98, kekuatan x1,3
+- Portal: cahaya dinamis (LambDynamicLights) dari bloom dibatasi maksimal level 11 dan mengikuti intensitas bloom; bounding box cahaya dipersempit (radius 14 -> 10) sesuai jangkauan nyata
+- Portal: alarm baru (portal_alarm) diputar saat portal terbuka, sampai habis, jeda 2 detik, lalu berulang selama blok portal masih ada
+- Portal: jejak motion trail tetap penuh sampai jarak 10 blok dari portal, memudar sampai 16 blok (sebelumnya mengikuti falloff flash dan kekuatan tetap saat portal terbuka)
+- Portal: semua efek layar (bloom, warp, exposure, flashbang, bayangan sisa, jejak) hanya digambar selagi portal terlihat dari kamera; berlindung di balik blok memudarkannya ke 0. Cek garis pandang ke tengah, atas, dan bawah ruang portal
+- Lamp: bloom post effect untuk Lamp menyala. Bentuknya kotak 1 blok yang meluas 0,3 blok di luar tepinya, berwarna dari tekstur Lamp (rata-rata piksel terang), memakai depth buffer sehingga tidak tembus dinding. Maksimal 16 Lamp terdekat di pandangan, memudar antara 24 dan 40 blok. Ikut berkedip bersama Lamp

@@ -73,5 +73,15 @@
         "attenuation_distance": 80
       }
     ]
+  },
+  "portal_alarm": {
+    "subtitle": "subtitles.backrooms.portal_alarm",
+    "sounds": [
+      {
+        "name": "backrooms:portal_alarm",
+        "volume": 1.0,
+        "attenuation_distance": 80
+      }
+    ]
   }
 }

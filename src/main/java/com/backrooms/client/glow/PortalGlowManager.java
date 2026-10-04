@@ -39,6 +39,8 @@ public final class PortalGlowManager {
 	private static final float LIGHT_BLUE = 0.47f;
 	/** Seberapa banyak cahaya portal menerangi permukaan (bukan sekadar mewarnai); 0..1, lihat colored_light.fsh. */
 	private static final float LIGHT_EMISSION = 1.0f;
+	/** Level cahaya maksimum yang dipancarkan bloom ke blok sekitar lewat LambDynamicLights (puncak bloom = level ini). */
+	public static final float MAX_DYNAMIC_LIGHT_LEVEL = 11.0f;
 
 	private static final List<Source> SOURCES = new ArrayList<>();
 
@@ -94,7 +96,7 @@ public final class PortalGlowManager {
 		}
 	}
 
-	/** Titik cahaya dinamis satu portal (tengah ruang portal dan level 0..15). Dipakai kompatibilitas LambDynamicLights. */
+	/** Titik cahaya dinamis satu portal (tengah ruang portal dan level 0..{@link #MAX_DYNAMIC_LIGHT_LEVEL}). Dipakai kompatibilitas LambDynamicLights. */
 	public record LightPoint(BlockPos center, float level) {
 	}
 
@@ -106,9 +108,10 @@ public final class PortalGlowManager {
 		long now = level.getGameTime();
 		List<LightPoint> points = new ArrayList<>(SOURCES.size());
 		for (Source source : SOURCES) {
-			float value = source.lightLevel(now);
+			// lightLevel() 0..15 mengikuti intensitas bloom; diskalakan agar puncaknya MAX_DYNAMIC_LIGHT_LEVEL.
+			float value = Math.min(1.0f, source.lightLevel(now) / 15.0f) * MAX_DYNAMIC_LIGHT_LEVEL;
 			if (value >= 0.5f) {
-				points.add(new LightPoint(source.center, Math.min(15.0f, value)));
+				points.add(new LightPoint(source.center, value));
 			}
 		}
 		return points;
@@ -162,6 +165,7 @@ public final class PortalGlowManager {
 	}
 
 	private static void tick(@Nullable ClientLevel level) {
+		PortalAlarm.tick(level);
 		if (level == null) {
 			SOURCES.forEach(source -> source.sounds.stop());
 			SOURCES.clear();
@@ -174,6 +178,7 @@ public final class PortalGlowManager {
 			Source source = iterator.next();
 			if (source.openedTick < 0L && level.getBlockState(source.center).is(ModBlocks.PLACEHOLDER_PORTAL)) {
 				source.openedTick = now;
+				PortalAlarm.start(level, source.center, now);
 				LocalPlayer player = Minecraft.getInstance().player;
 				if (player != null) {
 					PortalFlash.onOpened(level, player, source);

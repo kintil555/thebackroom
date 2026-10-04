@@ -20,8 +20,11 @@ import net.minecraft.core.BlockPos;
  * {@link PortalLight}; levelnya mengikuti bloom lewat {@link PortalGlowManager#lightPoints}.
  */
 public final class LdlCompat implements DynamicLightsInitializer {
-	/** Jangkauan cahaya (blok) dari tengah portal. */
-	private static final int RADIUS = 14;
+	/**
+	 * Jangkauan bounding box cahaya (blok) dari tengah portal. Level 11 padam di sekitar 5,7 blok (falloff LDL 1,935 per blok);
+	 * jarak vertikal dikompres 0,6 sehingga jangkauan vertikal maksimal sekitar 9,5 blok.
+	 */
+	private static final int RADIUS = 10;
 
 	private final Map<BlockPos, PortalLight> lights = new HashMap<>();
 
@@ -54,7 +57,7 @@ public final class LdlCompat implements DynamicLightsInitializer {
 		}
 	}
 
-	/** Cahaya titik di tengah portal; level 0..15 diperbarui tiap tick client. */
+	/** Cahaya titik di tengah portal; level 0..11 diperbarui tiap tick client. */
 	private static final class PortalLight implements DynamicLightBehavior {
 		private final double x;
 		private final double y;
@@ -88,7 +91,7 @@ public final class LdlCompat implements DynamicLightsInitializer {
 			double dy = (pos.getY() + 0.5 - this.y) * 0.6;
 			double dz = pos.getZ() + 0.5 - this.z;
 			double distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
-			return Math.max(0.0, Math.min(15.0, this.level - distance * falloffRatio));
+			return Math.max(0.0, Math.min(PortalGlowManager.MAX_DYNAMIC_LIGHT_LEVEL, this.level - distance * falloffRatio));
 		}
 
 		@Override

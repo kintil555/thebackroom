@@ -13,6 +13,7 @@ public final class ModSounds {
 	public static final SoundEvent PORTAL_LOOP = register("portal_loop");
 	public static final SoundEvent PORTAL_BURST_ENERGY = register("portal_burst_energy");
 	public static final SoundEvent PORTAL_AFTER_SPAWN = register("portal_after_spawn");
+	public static final SoundEvent PORTAL_ALARM = register("portal_alarm");
 
 	private ModSounds() {
 	}
