@@ -11,6 +11,7 @@
     "ItemModelResolverMixin",
     "LevelRendererMixin",
     "MultiPlayerGameModeMixin",
+    "PortalCompositeWarpMixin",
     "RenderSectionRegionAccessor",
     "SimpleSoundInstanceMixin"
   ],
