@@ -223,8 +223,7 @@ void main() {
         if (close > 0.001) {
             glow += closeGlow(local, close) * open;
         }
-        // Distorsi portal terbuka sekarang dikerjakan di dalam render portal (PortalCompositeWarp); postfx hanya untuk animasi menutup.
-        if (strength < 0.003 || close <= 0.001) {
+        if (strength < 0.003) {
             continue;
         }
 

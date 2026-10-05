@@ -13,7 +13,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import net.minecraft.client.Camera;
-import org.jspecify.annotations.Nullable;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -96,8 +95,6 @@ public final class PortalDistortRenderer {
 	private static ProjectionMatrixBuffer projectionBuffer;
 	private static PostChain chain;
 	private static boolean failed;
-	/** true jika tekstur data berisi portal aktif dari frame terakhir (dipakai komposit warp di render portal). */
-	private static boolean dataLive;
 	private static long lastFrameNanos;
 
 	private PortalDistortRenderer() {
@@ -110,7 +107,6 @@ public final class PortalDistortRenderer {
 
 	/** Dipanggil tiap frame setelah dunia tergambar dan sebelum GUI. Tidak melakukan apa-apa jika tak ada portal terbuka. */
 	public static void render(RenderTarget main, CrossFrameResourcePool pool, DeltaTracker deltaTracker) {
-		dataLive = false;
 		Minecraft minecraft = Minecraft.getInstance();
 		ClientLevel level = minecraft.level;
 		LocalPlayer player = minecraft.player;
@@ -168,13 +164,7 @@ public final class PortalDistortRenderer {
 		// Yang paling dekat lebih dulu: hanya MAX_SOURCES baris yang muat di tekstur data.
 		quads.sort(Comparator.comparingDouble(Quad::distance));
 		writeData(camera, quads, (float) (nowTicks / 20.0 % 64.0));
-		dataLive = true;
 		chain.process(main, pool);
-	}
-
-	/** Tekstur data portal frame terakhir untuk komposit warp, atau null jika tidak ada portal aktif. */
-	public static com.mojang.blaze3d.textures.@Nullable GpuTextureView warpDataView() {
-		return dataLive && dataTexture != null ? dataTexture.getTextureView() : null;
 	}
 
 	private static Quad evaluate(OpenPortals.Entry entry, Vec3 center, Camera camera, double nowTicks, float close, int width, int height) {

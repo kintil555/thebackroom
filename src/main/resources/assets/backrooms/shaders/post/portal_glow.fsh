@@ -117,7 +117,7 @@ void main() {
         vec2 ac = c * vec2(aspect, 1.0);
         float lens = LENS_STRENGTH * warpHere * sin(phase);
         c *= 1.0 + lens * dot(ac, ac);
-        vec2 uv = 0.5 + c;
+        vec2 uv = nearUv + c;
         uv += vec2(sin(uv.y * 14.0 + phase * 2.0), cos(uv.x * 11.0 + phase)) * WAVE_STRENGTH * warpHere;
 
         // Blur: sampling spiral di sekitar uv terdistorsi.
