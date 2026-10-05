@@ -43,7 +43,7 @@ const float WOBBLE_PX = 7.0;      // goyangan bergelombang
 const float RING_PX = 6.0;        // riak cincin medan yang bergerak keluar dari tengah
 const float TEAR_PX = 30.0;       // geser horizontal per pita (scanline tear)
 const float CHROMA_PX = 4.5;      // pemisahan warna merah/biru
-const float HALO = 0.55;          // lebar halo di luar kotak portal (satuan setengah-lebar)
+const float HALO = 0.12;          // lebar halo di luar kotak portal (satuan setengah-lebar)
 const float BAND_PX = 13.0;       // tinggi pita tear
 // Lengkungan permanen portal terbuka (fraksi koordinat lokal) dan tambahan saat menutup.
 const float CURVE = 0.14;

@@ -95,44 +95,9 @@ void main() {
 
     // Distorsi dan blur berpusat di portal terdekat (baris 0) dan hanya di piksel yang tidak menutupi portal, sehingga diam di dunia
     // dan tidak tembus dinding; tanpa portal di layar tidak ada distorsi.
-    vec4 nearPos = texelFetch(DataSampler, ivec2(0, 0), 0);
-    vec4 nearSize = texelFetch(DataSampler, ivec2(1, 0), 0);
-    float nearRadius = decode16(nearSize.rg) * 2.0 * OutSize.y;
-    vec2 nearCenter = (vec2(decode16(nearPos.rg), decode16(nearPos.ba)) * 2.0 - 0.5) * OutSize;
-    float warpMask = 0.0;
-    if (warp > 0.001 && nearRadius > 1.0) {
-        float radial = 1.0 - smoothstep(0.35, 1.25, length((pixel - nearCenter) / nearRadius));
-        if (radial > 0.001) {
-            warpMask = radial * depthOcclusionPlaneOpenness(DepthSampler, DepthSize, DataSampler, OCCLUSION_ROW, 0, texCoord);
-        }
-    }
-    float warpHere = warp * warpMask;
-
-    vec3 sceneColor;
-    if (warpHere > 0.001) {
-        // Distorsi: lensa yang berdenyut antara cembung dan cekung ditambah riak halus (kelipatan bulat dari fase agar loop mulus).
-        vec2 nearUv = vec2(nearCenter.x / OutSize.x, 1.0 - nearCenter.y / OutSize.y);
-        vec2 c = texCoord - nearUv;
-        float aspect = OutSize.x / OutSize.y;
-        vec2 ac = c * vec2(aspect, 1.0);
-        float lens = LENS_STRENGTH * warpHere * sin(phase);
-        c *= 1.0 + lens * dot(ac, ac);
-        vec2 uv = nearUv + c;
-        uv += vec2(sin(uv.y * 14.0 + phase * 2.0), cos(uv.x * 11.0 + phase)) * WAVE_STRENGTH * warpHere;
-
-        // Blur: sampling spiral di sekitar uv terdistorsi.
-        float radiusPx = warpHere * BLUR_MAX_PX * (OutSize.y / 1080.0);
-        vec2 texel = 1.0 / OutSize;
-        vec3 acc = vec3(0.0);
-        for (int k = 0; k < BLUR_TAPS; k++) {
-            float angle = float(k) * 2.39996323;
-            float r = sqrt((float(k) + 0.5) / float(BLUR_TAPS));
-            acc += textureLod(InSampler, uv + vec2(cos(angle), sin(angle)) * r * radiusPx * texel, 0.0).rgb;
-        }
-        sceneColor = acc / float(BLUR_TAPS);
-    } else {
-        sceneColor = textureLod(InSampler, texCoord, 0.0).rgb;
-    }
+    // Lensa/blur layar penuh di sekitar portal DIHAPUS: efek layar tidak menempel di dunia (ikut kamera dan hilang tiba-tiba saat
+    // portal keluar layar). Distorsi portal sekarang hanya ada di permukaan portal (PortalStencilWarp + portal_distort.fsh).
+    vec3 sceneColor = textureLod(InSampler, texCoord, 0.0).rgb;
 
     // Exposure: dunia digelapkan lebih dulu, bloom ditambahkan di atasnya sehingga latar tampak lebih gelap dari bloom.
     vec2 fromCenter = texCoord - 0.5;
