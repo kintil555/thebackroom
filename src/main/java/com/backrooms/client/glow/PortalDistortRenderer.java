@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import net.minecraft.client.Camera;
+import org.jspecify.annotations.Nullable;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -95,6 +96,11 @@ public final class PortalDistortRenderer {
 	private static ProjectionMatrixBuffer projectionBuffer;
 	private static PostChain chain;
 	private static boolean failed;
+	/** true jika tekstur data berisi portal aktif dari frame terakhir (dipakai pass warp di render portal). */
+	private static boolean dataLive;
+	/** Pass warp di render portal berjalan pada frame ini / frame lalu; selama aktif, postfx tidak ikut melengkungkan portal terbuka. */
+	private static boolean directWarpThisFrame;
+	private static boolean directWarpLastFrame;
 	private static long lastFrameNanos;
 
 	private PortalDistortRenderer() {
@@ -107,6 +113,9 @@ public final class PortalDistortRenderer {
 
 	/** Dipanggil tiap frame setelah dunia tergambar dan sebelum GUI. Tidak melakukan apa-apa jika tak ada portal terbuka. */
 	public static void render(RenderTarget main, CrossFrameResourcePool pool, DeltaTracker deltaTracker) {
+		directWarpLastFrame = directWarpThisFrame;
+		directWarpThisFrame = false;
+		dataLive = false;
 		Minecraft minecraft = Minecraft.getInstance();
 		ClientLevel level = minecraft.level;
 		LocalPlayer player = minecraft.player;
@@ -164,7 +173,18 @@ public final class PortalDistortRenderer {
 		// Yang paling dekat lebih dulu: hanya MAX_SOURCES baris yang muat di tekstur data.
 		quads.sort(Comparator.comparingDouble(Quad::distance));
 		writeData(camera, quads, (float) (nowTicks / 20.0 % 64.0));
+		dataLive = true;
 		chain.process(main, pool);
+	}
+
+	/** Tekstur data portal frame terakhir untuk pass warp di render portal, atau null jika tidak ada portal aktif. */
+	public static com.mojang.blaze3d.textures.@Nullable GpuTextureView warpDataView() {
+		return dataLive && dataTexture != null ? dataTexture.getTextureView() : null;
+	}
+
+	/** Dipanggil PortalStencilWarp setelah pass warp berhasil jalan pada frame ini. */
+	public static void markDirectWarpRan() {
+		directWarpThisFrame = true;
 	}
 
 	private static Quad evaluate(OpenPortals.Entry entry, Vec3 center, Camera camera, double nowTicks, float close, int width, int height) {
@@ -287,7 +307,8 @@ public final class PortalDistortRenderer {
 		}
 		int time = encode16(seconds / 64.0f);
 		image.setPixelABGR(0, ROW_GLOBAL, abgr(time >> 8, time & 0xFF, 0, 255));
-		for (int column = 1; column < DATA_WIDTH; column++) {
+		image.setPixelABGR(1, ROW_GLOBAL, abgr(directWarpLastFrame ? 255 : 0, 0, 0, 255));
+		for (int column = 2; column < DATA_WIDTH; column++) {
 			image.setPixelABGR(column, ROW_GLOBAL, 0);
 		}
 		OCCLUDERS.clear();

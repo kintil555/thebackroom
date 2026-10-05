@@ -165,6 +165,7 @@ void main() {
     float scale = size.y / 1080.0;
     float time = decode16(texelFetch(DataSampler, ivec2(0, ROW_GLOBAL), 0).rg) * 64.0;
 
+    bool directWarp = texelFetch(DataSampler, ivec2(1, ROW_GLOBAL), 0).r > 0.5;
     vec2 disp = vec2(0.0);
     vec3 glow = vec3(0.0);
     float chroma = 0.0;
@@ -223,7 +224,8 @@ void main() {
         if (close > 0.001) {
             glow += closeGlow(local, close) * open;
         }
-        if (strength < 0.003) {
+        // Jika pass warp di render portal aktif, ia yang melengkungkan portal terbuka; postfx hanya untuk animasi menutup.
+        if (strength < 0.003 || (directWarp && close <= 0.001)) {
             continue;
         }
 
